@@ -13,7 +13,9 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import mx.edu.itson.organizadoreventos.clientes.ClienteScreen
-import mx.edu.itson.organizadoreventos.screens.SplashScreen// Ajusta este import si guardaste SplashScreen en otra carpeta
+import mx.edu.itson.organizadoreventos.screens.SplashScreen
+import mx.edu.itson.organizadoreventos.finanzas.FinanzasScreen
+import mx.edu.itson.organizadoreventos.cotizacion.CotizacionScreen
 
 // 1. Rutas Globales para el flujo principal (Padre)
 object RutasGlobales {
@@ -55,7 +57,7 @@ fun AppNavigation() {
     }
 }
 
-// 4. TU CÓDIGO ORIGINAL (Ahora es llamado cuando termina la carga)
+// 4. TU CÓDIGO ORIGINAL ACTUALIZADO
 @Composable
 fun MainApp() {
     val navControllerTabs = rememberNavController()
@@ -90,9 +92,9 @@ fun MainApp() {
             modifier = Modifier.padding(paddingValues)
         ) {
             composable(Rutas.Cliente.ruta) { ClienteScreen() }
-            composable(Rutas.Agenda.ruta) { Text("Pantalla Agenda (Integrante 2)") } // Placeholder
-            composable(Rutas.Finanzas.ruta) { Text("Pantalla Finanzas (Integrante 3)") } // Placeholder
-            composable(Rutas.Cotizacion.ruta) { Text("Pantalla Cotización (Integrante 4)") } // Placeholder
+            composable(Rutas.Agenda.ruta) { Text("Pantalla Agenda (Integrante 2)") }
+            composable(Rutas.Finanzas.ruta) { FinanzasScreen() }
+            composable(Rutas.Cotizacion.ruta) { CotizacionScreen() }
         }
     }
 }

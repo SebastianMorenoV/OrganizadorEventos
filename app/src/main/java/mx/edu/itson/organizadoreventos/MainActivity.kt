@@ -23,8 +23,11 @@ class MainActivity : ComponentActivity() {
         enableEdgeToEdge()
         setContent {
             OrganizadorEventosTheme {
-                Surface(color = MaterialTheme.colorScheme.background) {
-                    AppNavigation() // <-- Cambiamos MainApp por AppNavigation aquí
+                Surface(
+                    modifier = Modifier.fillMaxSize(),
+                    color = MaterialTheme.colorScheme.background
+                ) {
+                    AppNavigation()
                 }
             }
         }
