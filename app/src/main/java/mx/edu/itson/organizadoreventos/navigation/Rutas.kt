@@ -12,6 +12,7 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
+import mx.edu.itson.organizadoreventos.agenda.AgendaScreen
 import mx.edu.itson.organizadoreventos.clientes.ClienteScreen
 import mx.edu.itson.organizadoreventos.screens.SplashScreen
 import mx.edu.itson.organizadoreventos.finanzas.FinanzasScreen
@@ -92,7 +93,7 @@ fun MainApp() {
             modifier = Modifier.padding(paddingValues)
         ) {
             composable(Rutas.Cliente.ruta) { ClienteScreen() }
-            composable(Rutas.Agenda.ruta) { Text("Pantalla Agenda (Integrante 2)") }
+            composable(Rutas.Agenda.ruta) { AgendaScreen() }
             composable(Rutas.Finanzas.ruta) { FinanzasScreen() }
             composable(Rutas.Cotizacion.ruta) { CotizacionScreen() }
         }
