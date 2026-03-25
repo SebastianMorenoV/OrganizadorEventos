@@ -14,11 +14,13 @@ import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import mx.edu.itson.organizadoreventos.agenda.AgendaScreen
 import mx.edu.itson.organizadoreventos.clientes.ClienteScreen
-import mx.edu.itson.organizadoreventos.screens.SplashScreen
+import mx.edu.itson.organizadoreventos.screens.LoginScreen
+import mx.edu.itson.organizadoreventos.screens.RegisterScreen
 import mx.edu.itson.organizadoreventos.finanzas.FinanzasScreen
 
 object RutasGlobales {
-    const val SPLASH = "splash"
+    const val LOGIN = "login"
+    const val REGISTER = "register"
     const val MAIN = "main"
 }
 
@@ -31,14 +33,36 @@ sealed class Rutas(val ruta: String, val titulo: String, val icono: ImageVector)
 @Composable
 fun AppNavigation() {
     val navController = rememberNavController()
-    NavHost(navController = navController, startDestination = RutasGlobales.SPLASH) {
-        composable(RutasGlobales.SPLASH) {
-            SplashScreen(onTimeout = {
-                navController.navigate(RutasGlobales.MAIN) {
-                    popUpTo(RutasGlobales.SPLASH) { inclusive = true }
+
+    NavHost(navController = navController, startDestination = RutasGlobales.LOGIN) {
+
+        // 1. Pantalla de Login
+        composable(RutasGlobales.LOGIN) {
+            LoginScreen(
+                onLoginSuccess = {
+                    navController.navigate(RutasGlobales.MAIN) {
+                        popUpTo(RutasGlobales.LOGIN) { inclusive = true }
+                    }
+                },
+                onNavigateToRegister = {
+                    navController.navigate(RutasGlobales.REGISTER)
                 }
-            })
+            )
         }
+
+        // 2. Pantalla de Registro
+        composable(RutasGlobales.REGISTER) {
+            RegisterScreen(
+                onRegisterSuccess = {
+                    navController.popBackStack()
+                },
+                onNavigateBack = {
+                    navController.popBackStack()
+                }
+            )
+        }
+
+        // 3. Contenedor Principal (Menú Inferior)
         composable(RutasGlobales.MAIN) { MainApp() }
     }
 }
@@ -77,12 +101,7 @@ fun MainApp() {
             modifier = Modifier.padding(paddingValues)
         ) {
             composable(Rutas.Cliente.ruta) { ClienteScreen() }
-            composable(Rutas.Agenda.ruta) {
-                // AQUÍ ESTÁ EL CAMBIO: Le pasamos la instrucción de navegar a Cliente
-                AgendaScreen(onNavigateToCliente = {
-                    navControllerTabs.navigate(Rutas.Cliente.ruta)
-                })
-            }
+            composable(Rutas.Agenda.ruta) { AgendaScreen(onNavigateToCliente = { navControllerTabs.navigate(Rutas.Cliente.ruta) }) }
             composable(Rutas.Finanzas.ruta) { FinanzasScreen() }
         }
     }

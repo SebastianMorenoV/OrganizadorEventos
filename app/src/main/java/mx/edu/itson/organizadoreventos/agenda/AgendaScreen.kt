@@ -14,6 +14,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -33,6 +34,8 @@ data class Servicio(
 fun AgendaScreen(onNavigateToCliente: () -> Unit = {}) {
 
     // --- ESTADOS DE RESERVA ---
+    var tipoEvento by remember { mutableStateOf("") } // NUEVO CAMPO
+
     var clienteSeleccionado by remember { mutableStateOf("") }
     var expandirClientes by remember { mutableStateOf(false) }
     val listaClientesMock = listOf("Luciano Barceló", "María González", "Familia López")
@@ -92,8 +95,9 @@ fun AgendaScreen(onNavigateToCliente: () -> Unit = {}) {
                         Text("$${subtotal.toFloat()}", fontWeight = FontWeight.ExtraBold, fontSize = 20.sp, color = MaterialTheme.colorScheme.primary)
                     }
                     Button(
-                        onClick = { mostrarDialogoAgendar = true }, // Lanza el Popup de Éxito
-                        enabled = clienteSeleccionado.isNotEmpty() && fechaSeleccionada.isNotEmpty() && horaSeleccionada.isNotEmpty() && subtotal > 0
+                        onClick = { mostrarDialogoAgendar = true },
+                        // VALIDACIÓN ACTUALIZADA INCLUYENDO EL TIPO DE EVENTO
+                        enabled = tipoEvento.isNotEmpty() && clienteSeleccionado.isNotEmpty() && fechaSeleccionada.isNotEmpty() && horaSeleccionada.isNotEmpty() && subtotal > 0
                     ) {
                         Text("Agendar Cita")
                     }
@@ -111,9 +115,23 @@ fun AgendaScreen(onNavigateToCliente: () -> Unit = {}) {
                 end = 16.dp
             )
         ) {
-            // 1. DATOS DEL CLIENTE
+            // 1. TIPO DE EVENTO
             item {
-                Text("1. Datos del Cliente", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
+                Text("1. Detalles del Evento", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
+                Spacer(modifier = Modifier.height(8.dp))
+                OutlinedTextField(
+                    value = tipoEvento,
+                    onValueChange = { tipoEvento = it },
+                    label = { Text("Tipo de evento (Boda, XV, etc.)") },
+                    modifier = Modifier.fillMaxWidth(),
+                    singleLine = true,
+                    keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Sentences)
+                )
+            }
+
+            // 2. DATOS DEL CLIENTE
+            item {
+                Text("2. Datos del Cliente", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
                 Spacer(modifier = Modifier.height(8.dp))
                 ExposedDropdownMenuBox(expanded = expandirClientes, onExpandedChange = { expandirClientes = it }) {
                     OutlinedTextField(
@@ -136,9 +154,9 @@ fun AgendaScreen(onNavigateToCliente: () -> Unit = {}) {
                 }
             }
 
-            // 2. FECHA Y HORA
+            // 3. FECHA Y HORA
             item {
-                Text("2. Cuándo será el evento", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
+                Text("3. Cuándo será el evento", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
                 Spacer(modifier = Modifier.height(8.dp))
                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     OutlinedButton(onClick = { showDatePicker = true }, modifier = Modifier.weight(1f)) {
@@ -155,11 +173,11 @@ fun AgendaScreen(onNavigateToCliente: () -> Unit = {}) {
                 }
             }
 
-            // 3. TÍTULO DE SERVICIOS Y BOTÓN DE AGREGAR (+)
+            // 4. TÍTULO DE SERVICIOS Y BOTÓN DE AGREGAR (+)
             item {
                 HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-                    Text("3. Catálogo de Servicios", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
+                    Text("4. Catálogo de Servicios", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
                     IconButton(
                         onClick = {
                             servicioEditando = null
@@ -191,10 +209,10 @@ fun AgendaScreen(onNavigateToCliente: () -> Unit = {}) {
                 )
             }
 
-            // 4. NOTAS EXTRAS
+            // 5. NOTAS EXTRAS
             item {
                 Spacer(modifier = Modifier.height(16.dp))
-                Text("4. Notas Extras", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
+                Text("5. Notas Extras", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
                 Spacer(modifier = Modifier.height(8.dp))
                 OutlinedTextField(
                     value = notasExtras,
@@ -246,11 +264,9 @@ fun AgendaScreen(onNavigateToCliente: () -> Unit = {}) {
                     Button(onClick = {
                         val precioFloat = tempPrecio.toFloatOrNull() ?: 0f
                         if (servicioEditando == null) {
-                            // Agregar (CORREGIDO: Ahora entra como false para no auto-seleccionarse)
                             val nuevoId = (listaServicios.maxOfOrNull { it.id } ?: 0) + 1
                             listaServicios.add(Servicio(nuevoId, tempNombre, tempDesc.ifBlank { "Sin descripción" }, precioFloat, false))
                         } else {
-                            // Editar
                             val index = listaServicios.indexOfFirst { it.id == servicioEditando!!.id }
                             if (index != -1) {
                                 listaServicios[index] = servicioEditando!!.copy(nombre = tempNombre, descripcion = tempDesc, precio = precioFloat)
@@ -289,7 +305,7 @@ fun AgendaScreen(onNavigateToCliente: () -> Unit = {}) {
             AlertDialog(
                 onDismissRequest = { mostrarDialogoAgendar = false },
                 title = { Text("¡Cita Agendada!", color = Color(0xFF388E3C), fontWeight = FontWeight.Bold) },
-                text = { Text("La cita para $clienteSeleccionado el $fechaSeleccionada a las $horaSeleccionada ha sido registrada exitosamente.") },
+                text = { Text("La cita para $clienteSeleccionado el $fechaSeleccionada a las $horaSeleccionada para el evento de tipo '$tipoEvento' ha sido registrada exitosamente.") },
                 confirmButton = {
                     Button(onClick = {
                         mostrarDialogoAgendar = false

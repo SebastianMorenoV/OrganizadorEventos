@@ -14,7 +14,6 @@ class ClienteViewModel : ViewModel() {
     var nombre by mutableStateOf("")
     var telefono by mutableStateOf("")
     var correo by mutableStateOf("")
-    var tipoEvento by mutableStateOf("")
 
     // ESTADO DE ERRORES Y CARGA
     var errorNombre by mutableStateOf(false)
@@ -29,24 +28,23 @@ class ClienteViewModel : ViewModel() {
         if (!errorNombre && !errorTelefono) {
             viewModelScope.launch {
                 estaGuardando = true
-                
-                // Simula el tiempo que tardaría en guardar en una base de datos o servidor
-                delay(1000) 
-                
+
+                // Simula el tiempo que tardaría en guardar
+                delay(1000)
+
                 // Limpia el formulario
                 nombre = ""
                 telefono = ""
                 correo = ""
-                tipoEvento = ""
-                
+
                 estaGuardando = false
                 guardadoExitoso = true
-                
+
                 println("Mock: El cliente se guardó correctamente para la demostración.")
             }
         }
     }
-    
+
     fun resetEstadoExito() {
         guardadoExitoso = false
     }

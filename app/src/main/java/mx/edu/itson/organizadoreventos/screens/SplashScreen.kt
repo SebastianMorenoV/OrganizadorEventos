@@ -38,15 +38,14 @@ fun SplashScreen(onTimeout: () -> Unit) {
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.Center
         ) {
-            // --- LOGO REAL DE LA EMPRESA ---
-            // Asegúrate de cambiar "logo_nanos" por el nombre exacto de tu archivo sin el .png
+            // --- LOGO DE LA EMPRESA ---
             Image(
                 painter = painterResource(id = R.drawable.logo_empresa),
                 contentDescription = "Logo de la Empresa",
                 modifier = Modifier
                     .size(160.dp)
-                    .clip(CircleShape) // Mantiene la forma circular
-                    .background(Color.White) // Fondo blanco por si tu imagen tiene transparencias
+                    .clip(CircleShape)
+                    .background(Color.White)
             )
 
             Spacer(modifier = Modifier.height(32.dp))

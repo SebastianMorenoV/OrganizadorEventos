@@ -8,7 +8,6 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Email
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Phone
-import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
@@ -23,7 +22,6 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 fun ClienteScreen(viewModel: ClienteViewModel = viewModel()) {
     val snackbarHostState = remember { SnackbarHostState() }
 
-    // Mostrar mensaje flotante (Snackbar) cuando se simula el guardado
     if (viewModel.guardadoExitoso) {
         LaunchedEffect(snackbarHostState) {
             snackbarHostState.showSnackbar("Cliente registrado con éxito")
@@ -86,25 +84,7 @@ fun ClienteScreen(viewModel: ClienteViewModel = viewModel()) {
                 onValueChange = { viewModel.correo = it },
                 label = { Text("Correo electrónico") },
                 leadingIcon = { Icon(Icons.Default.Email, contentDescription = null) },
-                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email, imeAction = ImeAction.Next),
-                modifier = Modifier.fillMaxWidth(),
-                enabled = !viewModel.estaGuardando
-            )
-
-            HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
-
-            Text(
-                text = "Detalles del Evento",
-                style = MaterialTheme.typography.titleMedium,
-                color = MaterialTheme.colorScheme.primary
-            )
-
-            OutlinedTextField(
-                value = viewModel.tipoEvento,
-                onValueChange = { viewModel.tipoEvento = it },
-                label = { Text("Tipo de evento (Boda, XV, etc.)") },
-                leadingIcon = { Icon(Icons.Default.Warning, contentDescription = null) },
-                keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Sentences, imeAction = ImeAction.Done),
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email, imeAction = ImeAction.Done),
                 modifier = Modifier.fillMaxWidth(),
                 enabled = !viewModel.estaGuardando
             )

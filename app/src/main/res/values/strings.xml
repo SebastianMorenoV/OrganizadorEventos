@@ -1,3 +1,13 @@
 <resources>
-    <string name="app_name">OrganizadorEventos</string>
+    <string name="app_name">Organizador de Eventos</string>
+
+    <string name="nombre_app">Eventor</string>
+    <string name="titulo_login">Inicio de sesión</string>
+    <string name="lbl_nombre">Nombre</string>
+    <string name="lbl_contrasena">Contraseña</string>
+    <string name="btn_iniciar_sesion">Iniciar sesión</string>
+    <string name="btn_registrarse">Registrarse</string>
+    <string name="desc_logo">Logo de la Empresa</string>
+    <string name="desc_ocultar_pass">Ocultar contraseña</string>
+    <string name="desc_mostrar_pass">Mostrar contraseña</string>
 </resources>

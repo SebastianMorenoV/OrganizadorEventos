@@ -74,7 +74,7 @@ fun FinanzasScreen() {
 
             Spacer(modifier = Modifier.height(16.dp))
 
-            // --- RESUMEN MENSUAL ACTUALIZADO ---
+            // --- RESUMEN MENSUAL ---
             ResumenMensualCard(eventosRegistrados)
 
             Spacer(modifier = Modifier.height(24.dp))
@@ -113,7 +113,7 @@ fun FinanzasScreen() {
     }
 }
 
-// --- COMPONENTE: RESUMEN MENSUAL (CORREGIDO PARA TODOS LOS EVENTOS) ---
+// --- COMPONENTE: RESUMEN MENSUAL ---
 @Composable
 fun ResumenMensualCard(eventos: List<EventoMock>) {
     val nombresMeses = arrayOf("Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio", "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre")
@@ -127,7 +127,6 @@ fun ResumenMensualCard(eventos: List<EventoMock>) {
 
     // 1. Ganancia Mensual: Abonos de TODOS los eventos que se hicieron en este mes
     val gananciaMensual = eventos.filter { it.estado != "Cancelado" }.sumOf { evento ->
-        // .toList() fuerza a Compose a reaccionar cuando se agrega un nuevo pago
         val abonosDelEvento = evento.abonos.toList()
         abonosDelEvento.filter { it.first.endsWith(filtroFechaAbono) }
             .sumOf { it.second.toDoubleOrNull() ?: 0.0 }
