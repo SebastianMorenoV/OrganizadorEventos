@@ -22,7 +22,6 @@ object RutasGlobales {
     const val MAIN = "main"
 }
 
-// Eliminamos Cotización de aquí
 sealed class Rutas(val ruta: String, val titulo: String, val icono: ImageVector) {
     object Cliente : Rutas("cliente", "Cliente", Icons.Default.Person)
     object Agenda : Rutas("agenda", "Agenda", Icons.Default.DateRange)
@@ -47,7 +46,6 @@ fun AppNavigation() {
 @Composable
 fun MainApp() {
     val navControllerTabs = rememberNavController()
-    // Eliminamos Rutas.Cotizacion de la lista
     val items = listOf(Rutas.Cliente, Rutas.Agenda, Rutas.Finanzas)
 
     Scaffold(
@@ -79,9 +77,13 @@ fun MainApp() {
             modifier = Modifier.padding(paddingValues)
         ) {
             composable(Rutas.Cliente.ruta) { ClienteScreen() }
-            composable(Rutas.Agenda.ruta) { AgendaScreen() }
+            composable(Rutas.Agenda.ruta) {
+                // AQUÍ ESTÁ EL CAMBIO: Le pasamos la instrucción de navegar a Cliente
+                AgendaScreen(onNavigateToCliente = {
+                    navControllerTabs.navigate(Rutas.Cliente.ruta)
+                })
+            }
             composable(Rutas.Finanzas.ruta) { FinanzasScreen() }
-            // Eliminamos la ruta de Cotización de aquí
         }
     }
 }
