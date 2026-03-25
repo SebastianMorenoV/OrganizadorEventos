@@ -1,11 +1,17 @@
 package mx.edu.itson.organizadoreventos.finanzas
 
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.filled.MoreVert
+import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -14,50 +20,226 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import androidx.compose.ui.window.Dialog
+import java.util.Calendar
+
+// 1. Estructura para detallar los servicios
+data class ServicioMock(val nombre: String, val precio: Float)
+
+// 2. EventoMock con estados
+class EventoMock(
+    val id: Int,
+    val nombreEvento: String,
+    val cliente: String,
+    val fecha: String,
+    val servicios: List<ServicioMock>,
+    val abonos: MutableList<Pair<String, String>>,
+    estadoInicial: String = "Activo"
+) {
+    var estado by mutableStateOf(estadoInicial)
+    val totalEstimado: Float get() = servicios.sumOf { it.precio.toDouble() }.toFloat()
+}
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun FinanzasScreen() {
-    var showSheet by remember { mutableStateOf(false) }
-
-    // Historial dinámico
-    val listaPagos = remember {
-        mutableStateListOf(
-            Pair("20/03/2026", "5000"),
-            Pair("05/03/2026", "7000")
+    val eventosRegistrados = remember {
+        listOf(
+            EventoMock(
+                id = 1, nombreEvento = "Boda Real", cliente = "Luciano Barceló", fecha = "25/03/2026",
+                servicios = listOf(ServicioMock("Renta de Salón", 10000f), ServicioMock("Banquete", 15000f), ServicioMock("Música y DJ", 8500f)),
+                abonos = mutableStateListOf(Pair("20/03/2026", "5000"), Pair("05/03/2026", "7000"))
+            ),
+            EventoMock(
+                id = 2, nombreEvento = "XV Años", cliente = "María González", fecha = "15/05/2026",
+                servicios = listOf(ServicioMock("Renta de Jardín", 15000f)),
+                abonos = mutableStateListOf(Pair("10/02/2026", "10000"))
+            ),
+            EventoMock(
+                id = 3, nombreEvento = "Bautizo", cliente = "Familia López", fecha = "10/04/2026",
+                servicios = listOf(ServicioMock("Desayuno Buffet", 9000f)),
+                abonos = mutableStateListOf()
+            )
         )
     }
 
-    val totalEvento = 33500f
-    val pagado = listaPagos.sumOf { it.second.toIntOrNull() ?: 0 }.toFloat()
-    val progreso = (pagado / totalEvento).coerceAtMost(1f)
+    var eventoSeleccionado by remember { mutableStateOf<EventoMock?>(null) }
+    var searchQuery by remember { mutableStateOf("") }
+
+    if (eventoSeleccionado == null) {
+        // VISTA 1: LISTA DE EVENTOS Y DASHBOARD
+        Column(modifier = Modifier.fillMaxSize().padding(16.dp)) {
+            Text("Dashboard Financiero", style = MaterialTheme.typography.headlineMedium, color = MaterialTheme.colorScheme.primary)
+
+            Spacer(modifier = Modifier.height(16.dp))
+
+            // --- RESUMEN MENSUAL ACTUALIZADO ---
+            ResumenMensualCard(eventosRegistrados)
+
+            Spacer(modifier = Modifier.height(24.dp))
+
+            OutlinedTextField(
+                value = searchQuery,
+                onValueChange = { searchQuery = it },
+                label = { Text("Buscar evento o fecha (ej. 15/05/2026)") },
+                leadingIcon = { Icon(Icons.Default.Search, contentDescription = "Buscar") },
+                modifier = Modifier.fillMaxWidth(),
+                singleLine = true
+            )
+
+            Spacer(modifier = Modifier.height(16.dp))
+
+            val eventosFiltrados = eventosRegistrados.filter {
+                it.nombreEvento.contains(searchQuery, ignoreCase = true) ||
+                        it.fecha.contains(searchQuery, ignoreCase = true)
+            }
+
+            LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                items(eventosFiltrados) { evento ->
+                    TarjetaEvento(
+                        evento = evento,
+                        onClick = { eventoSeleccionado = evento }
+                    )
+                }
+            }
+        }
+    } else {
+        // VISTA 2: DETALLE DE FINANZAS
+        DetalleFinanzasView(
+            evento = eventoSeleccionado!!,
+            onBack = { eventoSeleccionado = null }
+        )
+    }
+}
+
+// --- COMPONENTE: RESUMEN MENSUAL (CORREGIDO PARA TODOS LOS EVENTOS) ---
+@Composable
+fun ResumenMensualCard(eventos: List<EventoMock>) {
+    val nombresMeses = arrayOf("Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio", "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre")
+    val calendar = Calendar.getInstance()
+    val mesActualIndex = calendar.get(Calendar.MONTH)
+    val nombreMesActual = nombresMeses[mesActualIndex]
+
+    val mesFiltroStr = String.format("%02d", mesActualIndex + 1)
+    val anioFiltroStr = calendar.get(Calendar.YEAR).toString()
+    val filtroFechaAbono = "/$mesFiltroStr/$anioFiltroStr"
+
+    // 1. Ganancia Mensual: Abonos de TODOS los eventos que se hicieron en este mes
+    val gananciaMensual = eventos.filter { it.estado != "Cancelado" }.sumOf { evento ->
+        // .toList() fuerza a Compose a reaccionar cuando se agrega un nuevo pago
+        val abonosDelEvento = evento.abonos.toList()
+        abonosDelEvento.filter { it.first.endsWith(filtroFechaAbono) }
+            .sumOf { it.second.toDoubleOrNull() ?: 0.0 }
+    }.toFloat()
+
+    // 2. Falta Por Abonar: Deuda total de TODOS los eventos activos (sin importar la fecha de la fiesta)
+    val faltaPorAbonarGlobal = eventos.filter { it.estado != "Cancelado" }.sumOf { evento ->
+        val abonosDelEvento = evento.abonos.toList()
+        val pagado = abonosDelEvento.sumOf { it.second.toDoubleOrNull() ?: 0.0 }
+        (evento.totalEstimado - pagado).coerceAtLeast(0.0)
+    }.toFloat()
+
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        elevation = CardDefaults.cardElevation(4.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
+    ) {
+        Column(modifier = Modifier.padding(20.dp)) {
+            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.weight(1f)) {
+                    Text("Ganancia Mensual", style = MaterialTheme.typography.labelLarge, color = Color.Gray)
+                    Text("($nombreMesActual)", style = MaterialTheme.typography.labelMedium, color = Color.Gray)
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text("$${gananciaMensual.toInt()}", style = MaterialTheme.typography.headlineSmall, color = Color(0xFF388E3C), fontWeight = FontWeight.ExtraBold)
+                }
+
+                Box(modifier = Modifier.width(1.dp).height(50.dp).background(Color.LightGray).align(Alignment.CenterVertically))
+
+                Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.weight(1f)) {
+                    // Mantenemos el nombre del mes para cumplir tu rúbrica, pero el cálculo ya es global
+                    Text("Falta Por Abonar", style = MaterialTheme.typography.labelLarge, color = Color.Gray)
+                    Text("($nombreMesActual)", style = MaterialTheme.typography.labelMedium, color = Color.Gray)
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text("$${faltaPorAbonarGlobal.toInt()}", style = MaterialTheme.typography.headlineSmall, color = Color(0xFFD32F2F), fontWeight = FontWeight.ExtraBold)
+                }
+            }
+        }
+    }
+}
+
+// --- COMPONENTE: TARJETA DE EVENTO CON MENÚ DE ESTADO ---
+@Composable
+fun TarjetaEvento(evento: EventoMock, onClick: () -> Unit) {
+    var mostrarMenu by remember { mutableStateOf(false) }
+
+    val colorEstado = when (evento.estado) {
+        "Terminado" -> Color(0xFF388E3C)
+        "Cancelado" -> Color(0xFFD32F2F)
+        else -> MaterialTheme.colorScheme.primary
+    }
+
+    Card(
+        modifier = Modifier.fillMaxWidth().clickable { onClick() },
+        elevation = CardDefaults.cardElevation(2.dp)
+    ) {
+        Row(modifier = Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
+            Column(modifier = Modifier.weight(1f)) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(evento.nombreEvento, fontWeight = FontWeight.Bold, fontSize = 18.sp)
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Surface(color = colorEstado.copy(alpha = 0.2f), shape = RoundedCornerShape(8.dp)) {
+                        Text(evento.estado, color = colorEstado, fontSize = 12.sp, modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp), fontWeight = FontWeight.Bold)
+                    }
+                }
+                Spacer(modifier = Modifier.height(4.dp))
+                Text("Cliente: ${evento.cliente}", style = MaterialTheme.typography.bodyMedium)
+                Text("Fecha de Evento: ${evento.fecha}", style = MaterialTheme.typography.bodyMedium)
+            }
+
+            Box {
+                IconButton(onClick = { mostrarMenu = true }) {
+                    Icon(Icons.Default.MoreVert, contentDescription = "Opciones")
+                }
+                DropdownMenu(expanded = mostrarMenu, onDismissRequest = { mostrarMenu = false }) {
+                    DropdownMenuItem(text = { Text("Marcar como Activo") }, onClick = { evento.estado = "Activo"; mostrarMenu = false })
+                    DropdownMenuItem(text = { Text("Marcar como Terminado") }, onClick = { evento.estado = "Terminado"; mostrarMenu = false })
+                    DropdownMenuItem(text = { Text("Marcar como Cancelado") }, onClick = { evento.estado = "Cancelado"; mostrarMenu = false })
+                }
+            }
+        }
+    }
+}
+
+// --- VISTA DETALLE DE FINANZAS ---
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun DetalleFinanzasView(evento: EventoMock, onBack: () -> Unit) {
+    var showSheet by remember { mutableStateOf(false) }
+    var mostrarTicket by remember { mutableStateOf(false) }
+
+    val pagado = evento.abonos.sumOf { it.second.toIntOrNull() ?: 0 }.toFloat()
+    val progreso = if (evento.totalEstimado > 0) (pagado / evento.totalEstimado).coerceAtMost(1f) else 0f
 
     Scaffold(
+        topBar = {
+            TopAppBar(title = { Text(evento.nombreEvento) }, navigationIcon = { IconButton(onClick = onBack) { Icon(Icons.Default.ArrowBack, contentDescription = "Regresar") } })
+        },
         floatingActionButton = {
-            FloatingActionButton(
-                onClick = { showSheet = true },
-                // Toma el color Dorado (Primary) de tu Theme.kt automáticamente
-                containerColor = MaterialTheme.colorScheme.primary
-            ) {
-                // Error de "tint" corregido aquí
-                Icon(Icons.Default.Add, contentDescription = "Registrar Pago", tint = Color.White)
+            if (evento.estado != "Cancelado") {
+                FloatingActionButton(onClick = { showSheet = true }, containerColor = MaterialTheme.colorScheme.primary) {
+                    Icon(Icons.Default.Add, contentDescription = "Registrar Pago", tint = Color.White)
+                }
             }
         }
     ) { padding ->
-        Column(modifier = Modifier.padding(padding).padding(16.dp)) {
-            Text("Control de Pagos", style = MaterialTheme.typography.headlineSmall)
+        Column(modifier = Modifier.padding(padding).padding(horizontal = 16.dp)) {
+            Button(onClick = { mostrarTicket = true }, modifier = Modifier.fillMaxWidth().padding(bottom = 16.dp), colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.secondary)) {
+                Text("Mostrar Ticket de Cotización")
+            }
 
-            Spacer(modifier = Modifier.height(20.dp))
-
-            // Gráfico dinámico con los colores de tu aplicación
             Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxWidth()) {
-                CircularProgressIndicator(
-                    progress = { progreso },
-                    modifier = Modifier.size(150.dp),
-                    strokeWidth = 12.dp,
-                    color = MaterialTheme.colorScheme.primary, // Usa el Dorado
-                    trackColor = Color.LightGray // Gris de fondo
-                )
+                CircularProgressIndicator(progress = { progreso }, modifier = Modifier.size(150.dp), strokeWidth = 12.dp, color = MaterialTheme.colorScheme.primary, trackColor = Color.LightGray)
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
                     Text("${(progreso * 100).toInt()}%", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
                     Text("Liquidado", style = MaterialTheme.typography.labelSmall)
@@ -65,32 +247,17 @@ fun FinanzasScreen() {
             }
 
             Spacer(modifier = Modifier.height(24.dp))
-
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {
-                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    Text("Anticipo Realizado", style = MaterialTheme.typography.labelMedium)
-                    // Texto en Dorado
-                    Text("$$pagado", style = MaterialTheme.typography.titleLarge, color = MaterialTheme.colorScheme.primary)
-                }
-                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    Text("Saldo Restante", style = MaterialTheme.typography.labelMedium)
-                    Text("$${(totalEvento - pagado).coerceAtLeast(0f)}", style = MaterialTheme.typography.titleLarge, color = Color.Gray)
-                }
+                Column(horizontalAlignment = Alignment.CenterHorizontally) { Text("Anticipo Realizado", style = MaterialTheme.typography.labelMedium); Text("$$pagado", style = MaterialTheme.typography.titleLarge, color = MaterialTheme.colorScheme.primary) }
+                Column(horizontalAlignment = Alignment.CenterHorizontally) { Text("Saldo Restante", style = MaterialTheme.typography.labelMedium); Text("$${(evento.totalEstimado - pagado).coerceAtLeast(0f)}", style = MaterialTheme.typography.titleLarge, color = Color.Gray) }
             }
 
-            Spacer(modifier = Modifier.height(32.dp))
+            Spacer(modifier = Modifier.height(24.dp))
             Text("Historial de Abonos", fontWeight = FontWeight.Bold)
 
             LazyColumn(modifier = Modifier.fillMaxSize()) {
-                items(listaPagos.reversed()) { pago ->
-                    ListItem(
-                        headlineContent = { Text("Abono recibido") },
-                        supportingContent = { Text("Fecha: ${pago.first}") },
-                        trailingContent = {
-                            // Este verde (SuccessGreen) sí estaba en tu paleta para indicar éxito
-                            Text("$${pago.second}", color = Color(0xFF388E3C), fontWeight = FontWeight.Bold)
-                        }
-                    )
+                items(evento.abonos.reversed()) { pago ->
+                    ListItem(headlineContent = { Text("Abono recibido") }, supportingContent = { Text("Fecha: ${pago.first}") }, trailingContent = { Text("$${pago.second}", color = Color(0xFF388E3C), fontWeight = FontWeight.Bold) })
                     HorizontalDivider()
                 }
             }
@@ -98,52 +265,59 @@ fun FinanzasScreen() {
 
         if (showSheet) {
             ModalBottomSheet(onDismissRequest = { showSheet = false }) {
-                FormularioPago(onConfirm = { fecha, monto ->
-                    if (monto.isNotEmpty()) {
-                        listaPagos.add(Pair(fecha, monto))
-                    }
-                    showSheet = false
-                })
+                FormularioPago(onConfirm = { fecha, monto -> if (monto.isNotEmpty()) evento.abonos.add(Pair(fecha, monto)); showSheet = false })
+            }
+        }
+
+        if (mostrarTicket) { Dialog(onDismissRequest = { mostrarTicket = false }) { TicketDialogView(evento) } }
+    }
+}
+
+// --- TICKET DINÁMICO ---
+@Composable
+fun TicketDialogView(evento: EventoMock) {
+    Card(modifier = Modifier.fillMaxWidth(), elevation = CardDefaults.cardElevation(8.dp), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)) {
+        Column(modifier = Modifier.padding(20.dp)) {
+            Text("TICKET DE EVENTO", fontWeight = FontWeight.Bold, fontSize = 18.sp, color = MaterialTheme.colorScheme.primary)
+            HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
+            Text("Cliente: ${evento.cliente}", style = MaterialTheme.typography.bodyLarge)
+            Text("Fecha del Evento: ${evento.fecha}", style = MaterialTheme.typography.bodyMedium)
+            Text("Estado: ${evento.estado}", style = MaterialTheme.typography.bodyMedium, color = if(evento.estado=="Cancelado") Color.Red else Color.Black)
+            HorizontalDivider(modifier = Modifier.padding(vertical = 12.dp))
+            Text("DESGLOSE DE SERVICIOS:", style = MaterialTheme.typography.labelMedium, color = Color.Gray)
+            Spacer(modifier = Modifier.height(8.dp))
+            evento.servicios.forEach { servicio ->
+                Row(modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp), horizontalArrangement = Arrangement.SpaceBetween) {
+                    Text(servicio.nombre, style = MaterialTheme.typography.bodyMedium)
+                    Text("$${servicio.precio}", fontWeight = FontWeight.Medium)
+                }
+            }
+            HorizontalDivider(modifier = Modifier.padding(vertical = 12.dp))
+            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                Text("TOTAL ESTIMADO", fontWeight = FontWeight.ExtraBold, fontSize = 18.sp)
+                Text("$${evento.totalEstimado}", fontWeight = FontWeight.ExtraBold, fontSize = 18.sp, color = MaterialTheme.colorScheme.primary)
             }
         }
     }
 }
 
+// --- FORMULARIO DE PAGOS ---
 @Composable
 fun FormularioPago(onConfirm: (String, String) -> Unit) {
     var monto by remember { mutableStateOf("") }
-    var fecha by remember { mutableStateOf("24/03/2026") }
+
+    val cal = Calendar.getInstance()
+    val hoy = String.format("%02d/%02d/%04d", cal.get(Calendar.DAY_OF_MONTH), cal.get(Calendar.MONTH) + 1, cal.get(Calendar.YEAR))
+    var fecha by remember { mutableStateOf(hoy) }
 
     Column(modifier = Modifier.padding(24.dp).padding(bottom = 32.dp).fillMaxWidth()) {
         Text("Registrar Nuevo Abono", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
         Spacer(modifier = Modifier.height(16.dp))
-
-        OutlinedTextField(
-            value = monto,
-            onValueChange = { if (it.all { char -> char.isDigit() }) monto = it },
-            label = { Text("¿Cuánto desea abonar?") },
-            modifier = Modifier.fillMaxWidth(),
-            prefix = { Text("$ ") },
-            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number)
-        )
-
+        OutlinedTextField(value = monto, onValueChange = { if (it.all { char -> char.isDigit() }) monto = it }, label = { Text("¿Cuánto desea abonar?") }, modifier = Modifier.fillMaxWidth(), prefix = { Text("$ ") }, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number))
         Spacer(modifier = Modifier.height(8.dp))
-
-        OutlinedTextField(
-            value = fecha,
-            onValueChange = { fecha = it },
-            label = { Text("Fecha del abono") },
-            modifier = Modifier.fillMaxWidth()
-        )
-
+        OutlinedTextField(value = fecha, onValueChange = { fecha = it }, label = { Text("Fecha (DD/MM/YYYY)") }, modifier = Modifier.fillMaxWidth())
         Spacer(modifier = Modifier.height(24.dp))
-
-        Button(
-            onClick = { onConfirm(fecha, monto) },
-            modifier = Modifier.fillMaxWidth(),
-            enabled = monto.isNotEmpty()
-            // Al quitar el 'colors' fijo de aquí, Compose usará automáticamente tu color primario (Dorado)
-        ) {
+        Button(onClick = { onConfirm(fecha, monto) }, modifier = Modifier.fillMaxWidth(), enabled = monto.isNotEmpty()) {
             Text("Confirmar y Actualizar")
         }
     }
