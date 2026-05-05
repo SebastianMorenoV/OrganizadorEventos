@@ -20,9 +20,11 @@ import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 
+import mx.edu.itson.organizadoreventos.auth.AuthViewModel
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun RegisterScreen(onRegisterSuccess: () -> Unit, onNavigateBack: () -> Unit) {
+fun RegisterScreen(authViewModel: AuthViewModel, onRegisterSuccess: () -> Unit, onNavigateBack: () -> Unit) {
     val context = LocalContext.current
 
     var nombre by remember { mutableStateOf("") }
@@ -31,7 +33,25 @@ fun RegisterScreen(onRegisterSuccess: () -> Unit, onNavigateBack: () -> Unit) {
     var confirmarContrasena by remember { mutableStateOf("") }
     var contrasenaVisible by remember { mutableStateOf(false) }
 
+    val snackbarHostState = remember { SnackbarHostState() }
+
+    LaunchedEffect(authViewModel.authSuccess) {
+        if (authViewModel.authSuccess) {
+            Toast.makeText(context, "¡Cuenta creada con éxito!", Toast.LENGTH_SHORT).show()
+            onRegisterSuccess()
+            authViewModel.resetAuthSuccess()
+        }
+    }
+
+    LaunchedEffect(authViewModel.errorMessage) {
+        authViewModel.errorMessage?.let {
+            snackbarHostState.showSnackbar(it)
+            authViewModel.clearError()
+        }
+    }
+
     Scaffold(
+        snackbarHost = { SnackbarHost(snackbarHostState) },
         topBar = {
             TopAppBar(
                 title = { Text("Crear Cuenta") },
@@ -122,21 +142,21 @@ fun RegisterScreen(onRegisterSuccess: () -> Unit, onNavigateBack: () -> Unit) {
 
             Button(
                 onClick = {
-                    if (nombre.isNotBlank() && correo.isNotBlank() && contrasena.isNotBlank()) {
-                        if (contrasena == confirmarContrasena) {
-                            Toast.makeText(context, "¡Cuenta creada con éxito!", Toast.LENGTH_SHORT).show()
-                            onRegisterSuccess() // Avanzamos a la app principal
-                        } else {
-                            Toast.makeText(context, "Las contraseñas no coinciden", Toast.LENGTH_SHORT).show()
-                        }
+                    if (contrasena == confirmarContrasena) {
+                        authViewModel.registrar(nombre, correo, contrasena)
                     } else {
-                        Toast.makeText(context, "Por favor llena todos los campos", Toast.LENGTH_SHORT).show()
+                        Toast.makeText(context, "Las contraseñas no coinciden", Toast.LENGTH_SHORT).show()
                     }
                 },
                 modifier = Modifier.fillMaxWidth().height(50.dp),
-                colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary)
+                colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary),
+                enabled = !authViewModel.isLoading
             ) {
-                Text("Registrarse", fontSize = 16.sp, fontWeight = FontWeight.Bold)
+                if (authViewModel.isLoading) {
+                    CircularProgressIndicator(color = Color.White, modifier = Modifier.size(24.dp))
+                } else {
+                    Text("Registrarse", fontSize = 16.sp, fontWeight = FontWeight.Bold)
+                }
             }
         }
     }

@@ -24,52 +24,34 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import java.util.Calendar
 
-// 1. Estructura para detallar los servicios
-data class ServicioMock(val nombre: String, val precio: Float)
+import androidx.lifecycle.viewmodel.compose.viewModel
+import mx.edu.itson.organizadoreventos.model.Abono
+import mx.edu.itson.organizadoreventos.model.Evento
 
-// 2. EventoMock con estados
-class EventoMock(
-    val id: Int,
-    val nombreEvento: String,
-    val cliente: String,
-    val fecha: String,
-    val servicios: List<ServicioMock>,
-    val abonos: MutableList<Pair<String, String>>,
-    estadoInicial: String = "Activo"
-) {
-    var estado by mutableStateOf(estadoInicial)
-    val totalEstimado: Float get() = servicios.sumOf { it.precio.toDouble() }.toFloat()
-}
+val Evento.totalEstimado: Float
+    get() = servicios.sumOf { it.precio.toDouble() }.toFloat()
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun FinanzasScreen() {
-    val eventosRegistrados = remember {
-        listOf(
-            EventoMock(
-                id = 1, nombreEvento = "Boda Real", cliente = "Luciano Barceló", fecha = "25/03/2026",
-                servicios = listOf(ServicioMock("Renta de Salón", 10000f), ServicioMock("Banquete", 15000f), ServicioMock("Música y DJ", 8500f)),
-                abonos = mutableStateListOf(Pair("20/03/2026", "5000"), Pair("05/03/2026", "7000"))
-            ),
-            EventoMock(
-                id = 2, nombreEvento = "XV Años", cliente = "María González", fecha = "15/05/2026",
-                servicios = listOf(ServicioMock("Renta de Jardín", 15000f)),
-                abonos = mutableStateListOf(Pair("10/02/2026", "10000"))
-            ),
-            EventoMock(
-                id = 3, nombreEvento = "Bautizo", cliente = "Familia López", fecha = "10/04/2026",
-                servicios = listOf(ServicioMock("Desayuno Buffet", 9000f)),
-                abonos = mutableStateListOf()
-            )
-        )
-    }
+fun FinanzasScreen(viewModel: FinanzasViewModel = viewModel()) {
+    val eventosRegistrados by viewModel.listaEventos.collectAsState()
+    val snackbarHostState = remember { SnackbarHostState() }
 
-    var eventoSeleccionado by remember { mutableStateOf<EventoMock?>(null) }
+    LaunchedEffect(viewModel.errorMessage) {
+        viewModel.errorMessage?.let {
+            snackbarHostState.showSnackbar(it)
+            viewModel.clearError()
+        }
+    }
+    var eventoSeleccionado by remember { mutableStateOf<Evento?>(null) }
     var searchQuery by remember { mutableStateOf("") }
 
-    if (eventoSeleccionado == null) {
-        // VISTA 1: LISTA DE EVENTOS Y DASHBOARD
-        Column(modifier = Modifier.fillMaxSize().padding(16.dp)) {
+    Scaffold(
+        snackbarHost = { SnackbarHost(snackbarHostState) }
+    ) { paddingValues ->
+        if (eventoSeleccionado == null) {
+            // VISTA 1: LISTA DE EVENTOS Y DASHBOARD
+            Column(modifier = Modifier.fillMaxSize().padding(paddingValues).padding(16.dp)) {
             Text("Dashboard Financiero", style = MaterialTheme.typography.headlineMedium, color = MaterialTheme.colorScheme.primary)
 
             Spacer(modifier = Modifier.height(16.dp))
@@ -91,31 +73,39 @@ fun FinanzasScreen() {
             Spacer(modifier = Modifier.height(16.dp))
 
             val eventosFiltrados = eventosRegistrados.filter {
-                it.nombreEvento.contains(searchQuery, ignoreCase = true) ||
+                it.tipoEvento.contains(searchQuery, ignoreCase = true) ||
                         it.fecha.contains(searchQuery, ignoreCase = true)
             }
 
             LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 items(eventosFiltrados) { evento ->
-                    TarjetaEvento(
-                        evento = evento,
-                        onClick = { eventoSeleccionado = evento }
-                    )
+                        TarjetaEvento(
+                            evento = evento,
+                            onClick = { eventoSeleccionado = evento },
+                            onUpdateEstado = { nuevoEstado ->
+                                viewModel.actualizarEstadoEvento(evento.id, nuevoEstado)
+                            }
+                        )
                 }
             }
         }
     } else {
-        // VISTA 2: DETALLE DE FINANZAS
-        DetalleFinanzasView(
-            evento = eventoSeleccionado!!,
-            onBack = { eventoSeleccionado = null }
-        )
+            DetalleFinanzasView(
+                evento = eventoSeleccionado!!,
+                onBack = { eventoSeleccionado = null },
+                onRegistrarAbono = { fecha, monto ->
+                    viewModel.registrarAbono(eventoSeleccionado!!.id, fecha, monto)
+                    // Optimistic update so UI reacts immediately, but it will be overwritten by Flow
+                    eventoSeleccionado = eventoSeleccionado!!.copy(abonos = eventoSeleccionado!!.abonos + Abono(fecha = fecha, monto = monto))
+                }
+            )
+        }
     }
 }
 
 // --- COMPONENTE: RESUMEN MENSUAL ---
 @Composable
-fun ResumenMensualCard(eventos: List<EventoMock>) {
+fun ResumenMensualCard(eventos: List<Evento>) {
     val nombresMeses = arrayOf("Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio", "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre")
     val calendar = Calendar.getInstance()
     val mesActualIndex = calendar.get(Calendar.MONTH)
@@ -127,15 +117,15 @@ fun ResumenMensualCard(eventos: List<EventoMock>) {
 
     // 1. Ganancia Mensual: Abonos de TODOS los eventos que se hicieron en este mes
     val gananciaMensual = eventos.filter { it.estado != "Cancelado" }.sumOf { evento ->
-        val abonosDelEvento = evento.abonos.toList()
-        abonosDelEvento.filter { it.first.endsWith(filtroFechaAbono) }
-            .sumOf { it.second.toDoubleOrNull() ?: 0.0 }
+        val abonosDelEvento = evento.abonos
+        abonosDelEvento.filter { it.fecha.endsWith(filtroFechaAbono) }
+            .sumOf { it.monto.toDoubleOrNull() ?: 0.0 }
     }.toFloat()
 
     // 2. Falta Por Abonar: Deuda total de TODOS los eventos activos (sin importar la fecha de la fiesta)
     val faltaPorAbonarGlobal = eventos.filter { it.estado != "Cancelado" }.sumOf { evento ->
-        val abonosDelEvento = evento.abonos.toList()
-        val pagado = abonosDelEvento.sumOf { it.second.toDoubleOrNull() ?: 0.0 }
+        val abonosDelEvento = evento.abonos
+        val pagado = abonosDelEvento.sumOf { it.monto.toDoubleOrNull() ?: 0.0 }
         (evento.totalEstimado - pagado).coerceAtLeast(0.0)
     }.toFloat()
 
@@ -169,7 +159,7 @@ fun ResumenMensualCard(eventos: List<EventoMock>) {
 
 // --- COMPONENTE: TARJETA DE EVENTO CON MENÚ DE ESTADO ---
 @Composable
-fun TarjetaEvento(evento: EventoMock, onClick: () -> Unit) {
+fun TarjetaEvento(evento: Evento, onClick: () -> Unit, onUpdateEstado: (String) -> Unit) {
     var mostrarMenu by remember { mutableStateOf(false) }
 
     val colorEstado = when (evento.estado) {
@@ -185,14 +175,14 @@ fun TarjetaEvento(evento: EventoMock, onClick: () -> Unit) {
         Row(modifier = Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
             Column(modifier = Modifier.weight(1f)) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text(evento.nombreEvento, fontWeight = FontWeight.Bold, fontSize = 18.sp)
+                    Text(evento.tipoEvento, fontWeight = FontWeight.Bold, fontSize = 18.sp)
                     Spacer(modifier = Modifier.width(8.dp))
                     Surface(color = colorEstado.copy(alpha = 0.2f), shape = RoundedCornerShape(8.dp)) {
                         Text(evento.estado, color = colorEstado, fontSize = 12.sp, modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp), fontWeight = FontWeight.Bold)
                     }
                 }
                 Spacer(modifier = Modifier.height(4.dp))
-                Text("Cliente: ${evento.cliente}", style = MaterialTheme.typography.bodyMedium)
+                Text("Cliente: ${evento.clienteNombre}", style = MaterialTheme.typography.bodyMedium)
                 Text("Fecha de Evento: ${evento.fecha}", style = MaterialTheme.typography.bodyMedium)
             }
 
@@ -201,9 +191,9 @@ fun TarjetaEvento(evento: EventoMock, onClick: () -> Unit) {
                     Icon(Icons.Default.MoreVert, contentDescription = "Opciones")
                 }
                 DropdownMenu(expanded = mostrarMenu, onDismissRequest = { mostrarMenu = false }) {
-                    DropdownMenuItem(text = { Text("Marcar como Activo") }, onClick = { evento.estado = "Activo"; mostrarMenu = false })
-                    DropdownMenuItem(text = { Text("Marcar como Terminado") }, onClick = { evento.estado = "Terminado"; mostrarMenu = false })
-                    DropdownMenuItem(text = { Text("Marcar como Cancelado") }, onClick = { evento.estado = "Cancelado"; mostrarMenu = false })
+                    DropdownMenuItem(text = { Text("Marcar como Activo") }, onClick = { onUpdateEstado("Activo"); mostrarMenu = false })
+                    DropdownMenuItem(text = { Text("Marcar como Terminado") }, onClick = { onUpdateEstado("Terminado"); mostrarMenu = false })
+                    DropdownMenuItem(text = { Text("Marcar como Cancelado") }, onClick = { onUpdateEstado("Cancelado"); mostrarMenu = false })
                 }
             }
         }
@@ -213,16 +203,16 @@ fun TarjetaEvento(evento: EventoMock, onClick: () -> Unit) {
 // --- VISTA DETALLE DE FINANZAS ---
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun DetalleFinanzasView(evento: EventoMock, onBack: () -> Unit) {
+fun DetalleFinanzasView(evento: Evento, onBack: () -> Unit, onRegistrarAbono: (String, String) -> Unit) {
     var showSheet by remember { mutableStateOf(false) }
     var mostrarTicket by remember { mutableStateOf(false) }
 
-    val pagado = evento.abonos.sumOf { it.second.toIntOrNull() ?: 0 }.toFloat()
+    val pagado = evento.abonos.sumOf { it.monto.toIntOrNull() ?: 0 }.toFloat()
     val progreso = if (evento.totalEstimado > 0) (pagado / evento.totalEstimado).coerceAtMost(1f) else 0f
 
     Scaffold(
         topBar = {
-            TopAppBar(title = { Text(evento.nombreEvento) }, navigationIcon = { IconButton(onClick = onBack) { Icon(Icons.Default.ArrowBack, contentDescription = "Regresar") } })
+            TopAppBar(title = { Text(evento.tipoEvento) }, navigationIcon = { IconButton(onClick = onBack) { Icon(Icons.Default.ArrowBack, contentDescription = "Regresar") } })
         },
         floatingActionButton = {
             if (evento.estado != "Cancelado") {
@@ -256,7 +246,7 @@ fun DetalleFinanzasView(evento: EventoMock, onBack: () -> Unit) {
 
             LazyColumn(modifier = Modifier.fillMaxSize()) {
                 items(evento.abonos.reversed()) { pago ->
-                    ListItem(headlineContent = { Text("Abono recibido") }, supportingContent = { Text("Fecha: ${pago.first}") }, trailingContent = { Text("$${pago.second}", color = Color(0xFF388E3C), fontWeight = FontWeight.Bold) })
+                    ListItem(headlineContent = { Text("Abono recibido") }, supportingContent = { Text("Fecha: ${pago.fecha}") }, trailingContent = { Text("$${pago.monto}", color = Color(0xFF388E3C), fontWeight = FontWeight.Bold) })
                     HorizontalDivider()
                 }
             }
@@ -264,7 +254,10 @@ fun DetalleFinanzasView(evento: EventoMock, onBack: () -> Unit) {
 
         if (showSheet) {
             ModalBottomSheet(onDismissRequest = { showSheet = false }) {
-                FormularioPago(onConfirm = { fecha, monto -> if (monto.isNotEmpty()) evento.abonos.add(Pair(fecha, monto)); showSheet = false })
+                FormularioPago(onConfirm = { fecha, monto -> 
+                    onRegistrarAbono(fecha, monto)
+                    showSheet = false 
+                })
             }
         }
 
@@ -274,12 +267,12 @@ fun DetalleFinanzasView(evento: EventoMock, onBack: () -> Unit) {
 
 // --- TICKET DINÁMICO ---
 @Composable
-fun TicketDialogView(evento: EventoMock) {
+fun TicketDialogView(evento: Evento) {
     Card(modifier = Modifier.fillMaxWidth(), elevation = CardDefaults.cardElevation(8.dp), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)) {
         Column(modifier = Modifier.padding(20.dp)) {
             Text("TICKET DE EVENTO", fontWeight = FontWeight.Bold, fontSize = 18.sp, color = MaterialTheme.colorScheme.primary)
             HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
-            Text("Cliente: ${evento.cliente}", style = MaterialTheme.typography.bodyLarge)
+            Text("Cliente: ${evento.clienteNombre}", style = MaterialTheme.typography.bodyLarge)
             Text("Fecha del Evento: ${evento.fecha}", style = MaterialTheme.typography.bodyMedium)
             Text("Estado: ${evento.estado}", style = MaterialTheme.typography.bodyMedium, color = if(evento.estado=="Cancelado") Color.Red else Color.Black)
             HorizontalDivider(modifier = Modifier.padding(vertical = 12.dp))

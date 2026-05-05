@@ -24,16 +24,37 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import mx.edu.itson.organizadoreventos.R
 
+import mx.edu.itson.organizadoreventos.auth.AuthViewModel
+
 @Composable
-fun LoginScreen(onLoginSuccess: () -> Unit, onNavigateToRegister: () -> Unit) {
-    var usuario by remember { mutableStateOf("") }
+fun LoginScreen(authViewModel: AuthViewModel, onLoginSuccess: () -> Unit, onNavigateToRegister: () -> Unit) {
+    var correo by remember { mutableStateOf("") }
     var contrasena by remember { mutableStateOf("") }
     var contrasenaVisible by remember { mutableStateOf(false) }
 
-    Surface(
-        modifier = Modifier.fillMaxSize(),
-        color = MaterialTheme.colorScheme.background
-    ) {
+    val snackbarHostState = remember { SnackbarHostState() }
+
+    LaunchedEffect(authViewModel.authSuccess) {
+        if (authViewModel.authSuccess) {
+            onLoginSuccess()
+            authViewModel.resetAuthSuccess()
+        }
+    }
+
+    LaunchedEffect(authViewModel.errorMessage) {
+        authViewModel.errorMessage?.let {
+            snackbarHostState.showSnackbar(it)
+            authViewModel.clearError()
+        }
+    }
+
+    Scaffold(
+        snackbarHost = { SnackbarHost(snackbarHostState) }
+    ) { paddingValues ->
+        Surface(
+            modifier = Modifier.fillMaxSize().padding(paddingValues),
+            color = MaterialTheme.colorScheme.background
+        ) {
         Column(
             modifier = Modifier
                 .fillMaxSize()
@@ -70,12 +91,12 @@ fun LoginScreen(onLoginSuccess: () -> Unit, onNavigateToRegister: () -> Unit) {
             Spacer(modifier = Modifier.height(24.dp))
 
             OutlinedTextField(
-                value = usuario,
-                onValueChange = { usuario = it },
-                label = { Text(stringResource(id = R.string.lbl_nombre)) },
+                value = correo,
+                onValueChange = { correo = it },
+                label = { Text("Correo electrónico") },
                 modifier = Modifier.fillMaxWidth(),
                 singleLine = true,
-                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Text)
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email)
             )
 
             Spacer(modifier = Modifier.height(16.dp))
@@ -102,9 +123,7 @@ fun LoginScreen(onLoginSuccess: () -> Unit, onNavigateToRegister: () -> Unit) {
 
             Button(
                 onClick = {
-                    if (usuario.isNotBlank() && contrasena.isNotBlank()) {
-                        onLoginSuccess()
-                    }
+                    authViewModel.iniciarSesion(correo, contrasena)
                 },
                 modifier = Modifier
                     .fillMaxWidth()
@@ -112,9 +131,14 @@ fun LoginScreen(onLoginSuccess: () -> Unit, onNavigateToRegister: () -> Unit) {
                 colors = ButtonDefaults.buttonColors(
                     containerColor = MaterialTheme.colorScheme.primary,
                     contentColor = Color.White
-                )
+                ),
+                enabled = !authViewModel.isLoading
             ) {
-                Text(stringResource(id = R.string.btn_iniciar_sesion), fontSize = 16.sp, fontWeight = FontWeight.Bold)
+                if (authViewModel.isLoading) {
+                    CircularProgressIndicator(color = Color.White, modifier = Modifier.size(24.dp))
+                } else {
+                    Text(stringResource(id = R.string.btn_iniciar_sesion), fontSize = 16.sp, fontWeight = FontWeight.Bold)
+                }
             }
 
             Spacer(modifier = Modifier.height(16.dp))
@@ -124,7 +148,8 @@ fun LoginScreen(onLoginSuccess: () -> Unit, onNavigateToRegister: () -> Unit) {
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(50.dp),
-                border = BorderStroke(2.dp, MaterialTheme.colorScheme.primary)
+                border = BorderStroke(2.dp, MaterialTheme.colorScheme.primary),
+                enabled = !authViewModel.isLoading
             ) {
                 Text(
                     text = stringResource(id = R.string.btn_registrarse),

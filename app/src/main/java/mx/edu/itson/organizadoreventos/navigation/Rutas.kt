@@ -8,17 +8,21 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import mx.edu.itson.organizadoreventos.agenda.AgendaScreen
+import mx.edu.itson.organizadoreventos.auth.AuthViewModel
 import mx.edu.itson.organizadoreventos.clientes.ClienteScreen
 import mx.edu.itson.organizadoreventos.screens.LoginScreen
 import mx.edu.itson.organizadoreventos.screens.RegisterScreen
+import mx.edu.itson.organizadoreventos.screens.SplashScreen
 import mx.edu.itson.organizadoreventos.finanzas.FinanzasScreen
 
 object RutasGlobales {
+    const val SPLASH = "splash"
     const val LOGIN = "login"
     const val REGISTER = "register"
     const val MAIN = "main"
@@ -33,12 +37,27 @@ sealed class Rutas(val ruta: String, val titulo: String, val icono: ImageVector)
 @Composable
 fun AppNavigation() {
     val navController = rememberNavController()
+    val authViewModel: AuthViewModel = viewModel()
 
-    NavHost(navController = navController, startDestination = RutasGlobales.LOGIN) {
+    NavHost(navController = navController, startDestination = RutasGlobales.SPLASH) {
 
-        // 1. Pantalla de Login
+        composable(RutasGlobales.SPLASH) {
+            SplashScreen(onTimeout = {
+                if (authViewModel.usuarioActual != null) {
+                    navController.navigate(RutasGlobales.MAIN) {
+                        popUpTo(RutasGlobales.SPLASH) { inclusive = true }
+                    }
+                } else {
+                    navController.navigate(RutasGlobales.LOGIN) {
+                        popUpTo(RutasGlobales.SPLASH) { inclusive = true }
+                    }
+                }
+            })
+        }
+
         composable(RutasGlobales.LOGIN) {
             LoginScreen(
+                authViewModel = authViewModel,
                 onLoginSuccess = {
                     navController.navigate(RutasGlobales.MAIN) {
                         popUpTo(RutasGlobales.LOGIN) { inclusive = true }
@@ -50,11 +69,14 @@ fun AppNavigation() {
             )
         }
 
-        // 2. Pantalla de Registro
         composable(RutasGlobales.REGISTER) {
             RegisterScreen(
+                authViewModel = authViewModel,
                 onRegisterSuccess = {
-                    navController.popBackStack()
+                    navController.navigate(RutasGlobales.MAIN) {
+                        popUpTo(RutasGlobales.REGISTER) { inclusive = true }
+                        popUpTo(RutasGlobales.LOGIN) { inclusive = true }
+                    }
                 },
                 onNavigateBack = {
                     navController.popBackStack()
@@ -62,17 +84,40 @@ fun AppNavigation() {
             )
         }
 
-        // 3. Contenedor Principal (Menú Inferior)
-        composable(RutasGlobales.MAIN) { MainApp() }
+        composable(RutasGlobales.MAIN) { 
+            MainApp(
+                onLogout = {
+                    authViewModel.cerrarSesion()
+                    navController.navigate(RutasGlobales.LOGIN) {
+                        popUpTo(RutasGlobales.MAIN) { inclusive = true }
+                    }
+                }
+            ) 
+        }
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun MainApp() {
+fun MainApp(onLogout: () -> Unit) {
     val navControllerTabs = rememberNavController()
     val items = listOf(Rutas.Cliente, Rutas.Agenda, Rutas.Finanzas)
 
     Scaffold(
+        topBar = {
+            TopAppBar(
+                title = { Text("Organizador de Eventos") },
+                actions = {
+                    IconButton(onClick = onLogout) {
+                        Icon(Icons.Default.ExitToApp, contentDescription = "Cerrar Sesión")
+                    }
+                },
+                colors = TopAppBarDefaults.topAppBarColors(
+                    containerColor = MaterialTheme.colorScheme.primaryContainer,
+                    titleContentColor = MaterialTheme.colorScheme.onPrimaryContainer
+                )
+            )
+        },
         bottomBar = {
             NavigationBar {
                 val navBackStackEntry by navControllerTabs.currentBackStackEntryAsState()

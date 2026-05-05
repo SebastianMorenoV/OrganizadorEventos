@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "614174619708",
+    "project_id": "organizador-de-eventos-fa829",
+    "storage_bucket": "organizador-de-eventos-fa829.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:614174619708:android:8a32399f78cd76e574ab39",
+        "android_client_info": {
+          "package_name": "mx.edu.itson.organizadoreventos"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAx8a9ZSahfr2w8CDnNnve4igz40bhfwXU"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

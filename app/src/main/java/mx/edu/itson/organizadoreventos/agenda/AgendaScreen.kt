@@ -21,24 +21,22 @@ import androidx.compose.ui.unit.sp
 import java.text.SimpleDateFormat
 import java.util.*
 
-data class Servicio(
-    val id: Int,
-    var nombre: String,
-    var descripcion: String,
-    var precio: Float,
-    var seleccionado: Boolean
-)
+import androidx.lifecycle.viewmodel.compose.viewModel
+import mx.edu.itson.organizadoreventos.model.ServicioEvento
+import mx.edu.itson.organizadoreventos.model.Cliente
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun AgendaScreen(onNavigateToCliente: () -> Unit = {}) {
+fun AgendaScreen(viewModel: AgendaViewModel = viewModel(), onNavigateToCliente: () -> Unit = {}) {
+
+    val snackbarHostState = remember { SnackbarHostState() }
+    val listaClientes by viewModel.listaClientes.collectAsState()
 
     // --- ESTADOS DE RESERVA ---
-    var tipoEvento by remember { mutableStateOf("") } // NUEVO CAMPO
+    var tipoEvento by remember { mutableStateOf("") }
 
-    var clienteSeleccionado by remember { mutableStateOf("") }
+    var clienteSeleccionado by remember { mutableStateOf<Cliente?>(null) }
     var expandirClientes by remember { mutableStateOf(false) }
-    val listaClientesMock = listOf("Luciano Barceló", "María González", "Familia López")
 
     val datePickerState = rememberDatePickerState()
     var showDatePicker by remember { mutableStateOf(false) }
@@ -53,27 +51,40 @@ fun AgendaScreen(onNavigateToCliente: () -> Unit = {}) {
     // --- ESTADOS DE SERVICIOS ---
     val listaServicios = remember {
         mutableStateListOf(
-            Servicio(1, "Banquete Estándar (100 pers.)", "Plato fuerte de ave, guarnición y pan.", 15000f, false),
-            Servicio(2, "Horario Extendido", "Agrega 2 horas adicionales al evento.", 2500f, false),
-            Servicio(3, "Permiso de Alcohol", "Trámite y permiso del ayuntamiento.", 1500f, false),
-            Servicio(4, "Música y DJ", "DJ por 5 horas con equipo de sonido.", 3500f, false)
+            ServicioEvento("1", "Banquete Estándar (100 pers.)", "Plato fuerte de ave, guarnición y pan.", 15000f, false),
+            ServicioEvento("2", "Horario Extendido", "Agrega 2 horas adicionales al evento.", 2500f, false),
+            ServicioEvento("3", "Permiso de Alcohol", "Trámite y permiso del ayuntamiento.", 1500f, false),
+            ServicioEvento("4", "Música y DJ", "DJ por 5 horas con equipo de sonido.", 3500f, false)
         )
     }
 
     // --- ESTADOS PARA LOS POPUPS (DIALOGS) ---
     var mostrarDialogoServicio by remember { mutableStateOf(false) }
-    var servicioEditando by remember { mutableStateOf<Servicio?>(null) }
+    var servicioEditando by remember { mutableStateOf<ServicioEvento?>(null) }
     var tempNombre by remember { mutableStateOf("") }
     var tempDesc by remember { mutableStateOf("") }
     var tempPrecio by remember { mutableStateOf("") }
 
-    var servicioAEliminar by remember { mutableStateOf<Servicio?>(null) }
-    var mostrarDialogoAgendar by remember { mutableStateOf(false) }
+    var servicioAEliminar by remember { mutableStateOf<ServicioEvento?>(null) }
+    
+    LaunchedEffect(viewModel.guardadoExitoso) {
+        if (viewModel.guardadoExitoso) {
+            viewModel.resetEstadoExito()
+        }
+    }
+
+    LaunchedEffect(viewModel.errorMessage) {
+        viewModel.errorMessage?.let {
+            snackbarHostState.showSnackbar(it)
+            viewModel.clearError()
+        }
+    }
 
     // --- CÁLCULO DE SUBTOTAL ---
     val subtotal = listaServicios.filter { it.seleccionado }.sumOf { it.precio.toDouble() }
 
     Scaffold(
+        snackbarHost = { SnackbarHost(snackbarHostState) },
         topBar = {
             TopAppBar(
                 title = { Text("Agenda y Presupuesto") },
@@ -95,11 +106,28 @@ fun AgendaScreen(onNavigateToCliente: () -> Unit = {}) {
                         Text("$${subtotal.toFloat()}", fontWeight = FontWeight.ExtraBold, fontSize = 20.sp, color = MaterialTheme.colorScheme.primary)
                     }
                     Button(
-                        onClick = { mostrarDialogoAgendar = true },
+                        onClick = {
+                            val cliente = clienteSeleccionado
+                            if (cliente != null) {
+                                viewModel.agendarEvento(
+                                    tipoEvento = tipoEvento,
+                                    clienteId = cliente.id,
+                                    clienteNombre = cliente.nombre,
+                                    fecha = fechaSeleccionada,
+                                    hora = horaSeleccionada,
+                                    notas = notasExtras,
+                                    servicios = listaServicios.filter { it.seleccionado }
+                                )
+                            }
+                        },
                         // VALIDACIÓN ACTUALIZADA INCLUYENDO EL TIPO DE EVENTO
-                        enabled = tipoEvento.isNotEmpty() && clienteSeleccionado.isNotEmpty() && fechaSeleccionada.isNotEmpty() && horaSeleccionada.isNotEmpty() && subtotal > 0
+                        enabled = tipoEvento.isNotEmpty() && clienteSeleccionado != null && fechaSeleccionada.isNotEmpty() && horaSeleccionada.isNotEmpty() && subtotal > 0 && !viewModel.estaGuardando
                     ) {
-                        Text("Agendar Cita")
+                        if (viewModel.estaGuardando) {
+                            CircularProgressIndicator(color = Color.White, modifier = Modifier.size(20.dp))
+                        } else {
+                            Text("Agendar Cita")
+                        }
                     }
                 }
             }
@@ -135,15 +163,15 @@ fun AgendaScreen(onNavigateToCliente: () -> Unit = {}) {
                 Spacer(modifier = Modifier.height(8.dp))
                 ExposedDropdownMenuBox(expanded = expandirClientes, onExpandedChange = { expandirClientes = it }) {
                     OutlinedTextField(
-                        value = clienteSeleccionado.ifEmpty { "Seleccione un cliente" },
+                        value = clienteSeleccionado?.nombre ?: "Seleccione un cliente",
                         onValueChange = {},
                         readOnly = true,
                         trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expandirClientes) },
                         modifier = Modifier.fillMaxWidth().menuAnchor()
                     )
                     ExposedDropdownMenu(expanded = expandirClientes, onDismissRequest = { expandirClientes = false }) {
-                        listaClientesMock.forEach { cliente ->
-                            DropdownMenuItem(text = { Text(cliente) }, onClick = { clienteSeleccionado = cliente; expandirClientes = false })
+                        listaClientes.forEach { cliente ->
+                            DropdownMenuItem(text = { Text(cliente.nombre) }, onClick = { clienteSeleccionado = cliente; expandirClientes = false })
                         }
                         HorizontalDivider()
                         DropdownMenuItem(
@@ -264,8 +292,8 @@ fun AgendaScreen(onNavigateToCliente: () -> Unit = {}) {
                     Button(onClick = {
                         val precioFloat = tempPrecio.toFloatOrNull() ?: 0f
                         if (servicioEditando == null) {
-                            val nuevoId = (listaServicios.maxOfOrNull { it.id } ?: 0) + 1
-                            listaServicios.add(Servicio(nuevoId, tempNombre, tempDesc.ifBlank { "Sin descripción" }, precioFloat, false))
+                            val nuevoId = (listaServicios.mapNotNull { it.id.toIntOrNull() }.maxOrNull() ?: 0) + 1
+                            listaServicios.add(ServicioEvento(nuevoId.toString(), tempNombre, tempDesc.ifBlank { "Sin descripción" }, precioFloat, false))
                         } else {
                             val index = listaServicios.indexOfFirst { it.id == servicioEditando!!.id }
                             if (index != -1) {
@@ -301,14 +329,21 @@ fun AgendaScreen(onNavigateToCliente: () -> Unit = {}) {
         }
 
         // 4. Dialogo de CITA AGENDADA (Éxito)
-        if (mostrarDialogoAgendar) {
+        if (viewModel.guardadoExitoso) {
             AlertDialog(
-                onDismissRequest = { mostrarDialogoAgendar = false },
+                onDismissRequest = { viewModel.resetEstadoExito() },
                 title = { Text("¡Cita Agendada!", color = Color(0xFF388E3C), fontWeight = FontWeight.Bold) },
-                text = { Text("La cita para $clienteSeleccionado el $fechaSeleccionada a las $horaSeleccionada para el evento de tipo '$tipoEvento' ha sido registrada exitosamente.") },
+                text = { Text("La cita para ${clienteSeleccionado?.nombre} el $fechaSeleccionada a las $horaSeleccionada para el evento de tipo '$tipoEvento' ha sido registrada exitosamente.") },
                 confirmButton = {
                     Button(onClick = {
-                        mostrarDialogoAgendar = false
+                        viewModel.resetEstadoExito()
+                        // Reset forms
+                        tipoEvento = ""
+                        clienteSeleccionado = null
+                        fechaSeleccionada = ""
+                        horaSeleccionada = ""
+                        notasExtras = ""
+                        listaServicios.forEachIndexed { i, s -> listaServicios[i] = s.copy(seleccionado = false) }
                     }) { Text("Aceptar") }
                 }
             )
@@ -318,7 +353,7 @@ fun AgendaScreen(onNavigateToCliente: () -> Unit = {}) {
 
 @Composable
 fun ServicioCard(
-    servicio: Servicio,
+    servicio: ServicioEvento,
     onCheckedChange: (Boolean) -> Unit,
     onEdit: () -> Unit,
     onDelete: () -> Unit
