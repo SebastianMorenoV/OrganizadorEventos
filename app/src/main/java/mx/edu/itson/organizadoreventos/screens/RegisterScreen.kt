@@ -19,6 +19,11 @@ import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.foundation.Image
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.res.painterResource
+import mx.edu.itson.organizadoreventos.R
 
 import mx.edu.itson.organizadoreventos.auth.AuthViewModel
 
@@ -72,6 +77,16 @@ fun RegisterScreen(authViewModel: AuthViewModel, onRegisterSuccess: () -> Unit, 
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.Center
         ) {
+            Image(
+                painter = painterResource(id = R.drawable.logo_empresa),
+                contentDescription = "Logo",
+                modifier = Modifier
+                    .size(100.dp)
+                    .clip(CircleShape)
+            )
+            
+            Spacer(modifier = Modifier.height(16.dp))
+
             Text(
                 text = "Únete a Eventor",
                 style = MaterialTheme.typography.headlineMedium,

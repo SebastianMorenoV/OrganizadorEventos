@@ -22,6 +22,11 @@ import java.text.SimpleDateFormat
 import java.util.*
 
 import androidx.lifecycle.viewmodel.compose.viewModel
+import androidx.compose.foundation.Image
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.res.painterResource
+import mx.edu.itson.organizadoreventos.R
 import mx.edu.itson.organizadoreventos.model.ServicioEvento
 import mx.edu.itson.organizadoreventos.model.Cliente
 
@@ -83,7 +88,19 @@ fun AgendaScreen(viewModel: AgendaViewModel = viewModel(), onNavigateToCliente: 
         snackbarHost = { SnackbarHost(snackbarHostState) },
         topBar = {
             TopAppBar(
-                title = { Text("Agenda y Presupuesto") },
+                title = { 
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Image(
+                            painter = painterResource(id = R.drawable.logo_empresa),
+                            contentDescription = "Logo",
+                            modifier = Modifier
+                                .size(32.dp)
+                                .clip(CircleShape)
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text("Agenda y Presupuesto") 
+                    }
+                },
                 colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.primaryContainer)
             )
         },

@@ -25,6 +25,11 @@ import androidx.compose.ui.window.Dialog
 import java.util.Calendar
 
 import androidx.lifecycle.viewmodel.compose.viewModel
+import androidx.compose.foundation.Image
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.res.painterResource
+import mx.edu.itson.organizadoreventos.R
 import mx.edu.itson.organizadoreventos.model.Abono
 import mx.edu.itson.organizadoreventos.model.Evento
 
@@ -52,7 +57,17 @@ fun FinanzasScreen(viewModel: FinanzasViewModel = viewModel()) {
         if (eventoSeleccionado == null) {
             // VISTA 1: LISTA DE EVENTOS Y DASHBOARD
             Column(modifier = Modifier.fillMaxSize().padding(paddingValues).padding(16.dp)) {
-            Text("Dashboard Financiero", style = MaterialTheme.typography.headlineMedium, color = MaterialTheme.colorScheme.primary)
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Image(
+                    painter = painterResource(id = R.drawable.logo_empresa),
+                    contentDescription = "Logo",
+                    modifier = Modifier
+                        .size(40.dp)
+                        .clip(CircleShape)
+                )
+                Spacer(modifier = Modifier.width(12.dp))
+                Text("Dashboard Financiero", style = MaterialTheme.typography.headlineMedium, color = MaterialTheme.colorScheme.primary)
+            }
 
             Spacer(modifier = Modifier.height(16.dp))
 
@@ -212,7 +227,22 @@ fun DetalleFinanzasView(evento: Evento, onBack: () -> Unit, onRegistrarAbono: (S
 
     Scaffold(
         topBar = {
-            TopAppBar(title = { Text(evento.tipoEvento) }, navigationIcon = { IconButton(onClick = onBack) { Icon(Icons.Default.ArrowBack, contentDescription = "Regresar") } })
+            TopAppBar(
+                title = { 
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Image(
+                            painter = painterResource(id = R.drawable.logo_empresa),
+                            contentDescription = "Logo",
+                            modifier = Modifier
+                                .size(32.dp)
+                                .clip(CircleShape)
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(evento.tipoEvento)
+                    }
+                }, 
+                navigationIcon = { IconButton(onClick = onBack) { Icon(Icons.Default.ArrowBack, contentDescription = "Regresar") } }
+            )
         },
         floatingActionButton = {
             if (evento.estado != "Cancelado" && (evento.totalEstimado - pagado) > 0) {
