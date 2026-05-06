@@ -55,108 +55,120 @@ fun LoginScreen(authViewModel: AuthViewModel, onLoginSuccess: () -> Unit, onNavi
             modifier = Modifier.fillMaxSize().padding(paddingValues),
             color = MaterialTheme.colorScheme.background
         ) {
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(24.dp),
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.Center
-        ) {
-            Image(
-                painter = painterResource(id = R.drawable.logo_empresa),
-                contentDescription = stringResource(id = R.string.desc_logo),
+            Column(
                 modifier = Modifier
-                    .size(120.dp)
-                    .clip(CircleShape)
-            )
+                    .fillMaxSize()
+                    .padding(24.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.Center
+            ) {
+                Image(
+                    painter = painterResource(id = R.drawable.logo_empresa),
+                    contentDescription = stringResource(id = R.string.desc_logo),
+                    modifier = Modifier
+                        .size(120.dp)
+                        .clip(CircleShape)
+                )
 
-            Spacer(modifier = Modifier.height(8.dp))
+                Spacer(modifier = Modifier.height(8.dp))
 
-            Text(
-                text = stringResource(id = R.string.nombre_app),
-                style = MaterialTheme.typography.displaySmall,
-                color = MaterialTheme.colorScheme.primary,
-                fontWeight = FontWeight.ExtraBold
-            )
+                Text(
+                    text = stringResource(id = R.string.nombre_app),
+                    style = MaterialTheme.typography.displaySmall,
+                    color = MaterialTheme.colorScheme.primary,
+                    fontWeight = FontWeight.ExtraBold
+                )
 
-            Spacer(modifier = Modifier.height(32.dp))
+                Spacer(modifier = Modifier.height(32.dp))
 
-            Text(
-                text = stringResource(id = R.string.titulo_login),
-                style = MaterialTheme.typography.titleLarge,
-                color = Color.Gray,
-                fontWeight = FontWeight.Bold
-            )
+                Text(
+                    text = stringResource(id = R.string.titulo_login),
+                    style = MaterialTheme.typography.titleLarge,
+                    color = Color.Gray,
+                    fontWeight = FontWeight.Bold
+                )
 
-            Spacer(modifier = Modifier.height(24.dp))
+                Spacer(modifier = Modifier.height(24.dp))
 
-            OutlinedTextField(
-                value = correo,
-                onValueChange = { correo = it },
-                label = { Text("Correo electrónico") },
-                modifier = Modifier.fillMaxWidth(),
-                singleLine = true,
-                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email)
-            )
+                OutlinedTextField(
+                    value = correo,
+                    onValueChange = { correo = it },
+                    label = { Text("Correo electrónico") },
+                    modifier = Modifier.fillMaxWidth(),
+                    singleLine = true,
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email)
+                )
 
-            Spacer(modifier = Modifier.height(16.dp))
+                Spacer(modifier = Modifier.height(16.dp))
 
-            OutlinedTextField(
-                value = contrasena,
-                onValueChange = { contrasena = it },
-                label = { Text(stringResource(id = R.string.lbl_contrasena)) },
-                modifier = Modifier.fillMaxWidth(),
-                singleLine = true,
-                visualTransformation = if (contrasenaVisible) VisualTransformation.None else PasswordVisualTransformation(),
-                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
-                trailingIcon = {
-                    val icono = if (contrasenaVisible) Icons.Filled.Visibility else Icons.Filled.VisibilityOff
-                    val descripcion = if (contrasenaVisible) stringResource(id = R.string.desc_ocultar_pass) else stringResource(id = R.string.desc_mostrar_pass)
+                OutlinedTextField(
+                    value = contrasena,
+                    onValueChange = { contrasena = it },
+                    label = { Text(stringResource(id = R.string.lbl_contrasena)) },
+                    modifier = Modifier.fillMaxWidth(),
+                    singleLine = true,
+                    visualTransformation = if (contrasenaVisible) VisualTransformation.None else PasswordVisualTransformation(),
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
+                    trailingIcon = {
+                        val icono =
+                            if (contrasenaVisible) Icons.Filled.Visibility else Icons.Filled.VisibilityOff
+                        val descripcion =
+                            if (contrasenaVisible) stringResource(id = R.string.desc_ocultar_pass) else stringResource(
+                                id = R.string.desc_mostrar_pass
+                            )
 
-                    IconButton(onClick = { contrasenaVisible = !contrasenaVisible }) {
-                        Icon(imageVector = icono, contentDescription = descripcion)
+                        IconButton(onClick = { contrasenaVisible = !contrasenaVisible }) {
+                            Icon(imageVector = icono, contentDescription = descripcion)
+                        }
+                    }
+                )
+
+                Spacer(modifier = Modifier.height(48.dp))
+
+                Button(
+                    onClick = {
+                        authViewModel.iniciarSesion(correo, contrasena)
+                    },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(50.dp),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = MaterialTheme.colorScheme.primary,
+                        contentColor = Color.White
+                    ),
+                    enabled = !authViewModel.isLoading
+                ) {
+                    if (authViewModel.isLoading) {
+                        CircularProgressIndicator(
+                            color = Color.White,
+                            modifier = Modifier.size(24.dp)
+                        )
+                    } else {
+                        Text(
+                            stringResource(id = R.string.btn_iniciar_sesion),
+                            fontSize = 16.sp,
+                            fontWeight = FontWeight.Bold
+                        )
                     }
                 }
-            )
 
-            Spacer(modifier = Modifier.height(48.dp))
+                Spacer(modifier = Modifier.height(16.dp))
 
-            Button(
-                onClick = {
-                    authViewModel.iniciarSesion(correo, contrasena)
-                },
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(50.dp),
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = MaterialTheme.colorScheme.primary,
-                    contentColor = Color.White
-                ),
-                enabled = !authViewModel.isLoading
-            ) {
-                if (authViewModel.isLoading) {
-                    CircularProgressIndicator(color = Color.White, modifier = Modifier.size(24.dp))
-                } else {
-                    Text(stringResource(id = R.string.btn_iniciar_sesion), fontSize = 16.sp, fontWeight = FontWeight.Bold)
+                OutlinedButton(
+                    onClick = onNavigateToRegister,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(50.dp),
+                    border = BorderStroke(2.dp, MaterialTheme.colorScheme.primary),
+                    enabled = !authViewModel.isLoading
+                ) {
+                    Text(
+                        text = stringResource(id = R.string.btn_registrarse),
+                        fontSize = 16.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.primary
+                    )
                 }
-            }
-
-            Spacer(modifier = Modifier.height(16.dp))
-
-            OutlinedButton(
-                onClick = onNavigateToRegister,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(50.dp),
-                border = BorderStroke(2.dp, MaterialTheme.colorScheme.primary),
-                enabled = !authViewModel.isLoading
-            ) {
-                Text(
-                    text = stringResource(id = R.string.btn_registrarse),
-                    fontSize = 16.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.primary
-                )
             }
         }
     }

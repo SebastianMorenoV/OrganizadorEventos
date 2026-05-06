@@ -96,7 +96,7 @@ fun FinanzasScreen(viewModel: FinanzasViewModel = viewModel()) {
                 onRegistrarAbono = { fecha, monto ->
                     viewModel.registrarAbono(eventoSeleccionado!!.id, fecha, monto)
                     // Optimistic update so UI reacts immediately, but it will be overwritten by Flow
-                    eventoSeleccionado = eventoSeleccionado!!.copy(abonos = eventoSeleccionado!!.abonos + Abono(fecha = fecha, monto = monto))
+                    eventoSeleccionado = eventoSeleccionado!!.copy(abonos = eventoSeleccionado!!.abonos + (System.currentTimeMillis().toString() to Abono(fecha = fecha, monto = monto)))
                 }
             )
         }
@@ -117,14 +117,14 @@ fun ResumenMensualCard(eventos: List<Evento>) {
 
     // 1. Ganancia Mensual: Abonos de TODOS los eventos que se hicieron en este mes
     val gananciaMensual = eventos.filter { it.estado != "Cancelado" }.sumOf { evento ->
-        val abonosDelEvento = evento.abonos
+        val abonosDelEvento = evento.abonos.values.toList()
         abonosDelEvento.filter { it.fecha.endsWith(filtroFechaAbono) }
             .sumOf { it.monto.toDoubleOrNull() ?: 0.0 }
     }.toFloat()
 
     // 2. Falta Por Abonar: Deuda total de TODOS los eventos activos (sin importar la fecha de la fiesta)
     val faltaPorAbonarGlobal = eventos.filter { it.estado != "Cancelado" }.sumOf { evento ->
-        val abonosDelEvento = evento.abonos
+        val abonosDelEvento = evento.abonos.values.toList()
         val pagado = abonosDelEvento.sumOf { it.monto.toDoubleOrNull() ?: 0.0 }
         (evento.totalEstimado - pagado).coerceAtLeast(0.0)
     }.toFloat()
@@ -207,7 +207,7 @@ fun DetalleFinanzasView(evento: Evento, onBack: () -> Unit, onRegistrarAbono: (S
     var showSheet by remember { mutableStateOf(false) }
     var mostrarTicket by remember { mutableStateOf(false) }
 
-    val pagado = evento.abonos.sumOf { it.monto.toIntOrNull() ?: 0 }.toFloat()
+    val pagado = evento.abonos.values.sumOf { it.monto.toIntOrNull() ?: 0 }.toFloat()
     val progreso = if (evento.totalEstimado > 0) (pagado / evento.totalEstimado).coerceAtMost(1f) else 0f
 
     Scaffold(
@@ -215,7 +215,7 @@ fun DetalleFinanzasView(evento: Evento, onBack: () -> Unit, onRegistrarAbono: (S
             TopAppBar(title = { Text(evento.tipoEvento) }, navigationIcon = { IconButton(onClick = onBack) { Icon(Icons.Default.ArrowBack, contentDescription = "Regresar") } })
         },
         floatingActionButton = {
-            if (evento.estado != "Cancelado") {
+            if (evento.estado != "Cancelado" && (evento.totalEstimado - pagado) > 0) {
                 FloatingActionButton(onClick = { showSheet = true }, containerColor = MaterialTheme.colorScheme.primary) {
                     Icon(Icons.Default.Add, contentDescription = "Registrar Pago", tint = Color.White)
                 }
@@ -245,7 +245,7 @@ fun DetalleFinanzasView(evento: Evento, onBack: () -> Unit, onRegistrarAbono: (S
             Text("Historial de Abonos", fontWeight = FontWeight.Bold)
 
             LazyColumn(modifier = Modifier.fillMaxSize()) {
-                items(evento.abonos.reversed()) { pago ->
+                items(evento.abonos.values.toList().reversed()) { pago ->
                     ListItem(headlineContent = { Text("Abono recibido") }, supportingContent = { Text("Fecha: ${pago.fecha}") }, trailingContent = { Text("$${pago.monto}", color = Color(0xFF388E3C), fontWeight = FontWeight.Bold) })
                     HorizontalDivider()
                 }

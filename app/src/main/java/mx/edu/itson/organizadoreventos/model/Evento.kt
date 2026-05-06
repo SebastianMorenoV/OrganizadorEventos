@@ -17,7 +17,7 @@ data class Evento(
     val hora: String = "",
     val notas: String = "",
     val servicios: List<ServicioEvento> = emptyList(),
-    val abonos: List<Abono> = emptyList(),
+    val abonos: Map<String, Abono> = emptyMap(),
     val estado: String = "Activo"
 )
 

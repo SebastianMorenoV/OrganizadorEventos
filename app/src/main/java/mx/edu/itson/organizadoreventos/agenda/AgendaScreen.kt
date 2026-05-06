@@ -67,11 +67,7 @@ fun AgendaScreen(viewModel: AgendaViewModel = viewModel(), onNavigateToCliente: 
 
     var servicioAEliminar by remember { mutableStateOf<ServicioEvento?>(null) }
     
-    LaunchedEffect(viewModel.guardadoExitoso) {
-        if (viewModel.guardadoExitoso) {
-            viewModel.resetEstadoExito()
-        }
-    }
+
 
     LaunchedEffect(viewModel.errorMessage) {
         viewModel.errorMessage?.let {

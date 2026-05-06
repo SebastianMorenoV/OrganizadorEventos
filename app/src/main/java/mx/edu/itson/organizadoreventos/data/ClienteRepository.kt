@@ -59,4 +59,26 @@ class ClienteRepository {
         ref.addValueEventListener(listener)
         awaitClose { ref.removeEventListener(listener) }
     }
+
+    suspend fun actualizarCliente(cliente: Cliente): Result<Unit> {
+        val ref = getClientesRef() ?: return Result.failure(Exception("Usuario no autenticado"))
+        
+        return try {
+            ref.child(cliente.id).setValue(cliente).await()
+            Result.success(Unit)
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
+    suspend fun eliminarCliente(clienteId: String): Result<Unit> {
+        val ref = getClientesRef() ?: return Result.failure(Exception("Usuario no autenticado"))
+        
+        return try {
+            ref.child(clienteId).removeValue().await()
+            Result.success(Unit)
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
 }
