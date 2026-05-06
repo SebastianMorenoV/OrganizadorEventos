@@ -54,13 +54,15 @@ fun AgendaScreen(viewModel: AgendaViewModel = viewModel(), onNavigateToCliente: 
     var notasExtras by remember { mutableStateOf("") }
 
     // --- ESTADOS DE SERVICIOS ---
-    val listaServicios = remember {
-        mutableStateListOf(
-            ServicioEvento("1", "Banquete Estándar (100 pers.)", "Plato fuerte de ave, guarnición y pan.", 15000f, false),
-            ServicioEvento("2", "Horario Extendido", "Agrega 2 horas adicionales al evento.", 2500f, false),
-            ServicioEvento("3", "Permiso de Alcohol", "Trámite y permiso del ayuntamiento.", 1500f, false),
-            ServicioEvento("4", "Música y DJ", "DJ por 5 horas con equipo de sonido.", 3500f, false)
-        )
+    val listaServiciosBase by viewModel.listaServicios.collectAsState()
+    val listaServicios = remember { mutableStateListOf<ServicioEvento>() }
+
+    LaunchedEffect(listaServiciosBase) {
+        val currentSelections = listaServicios.associate { it.id to it.seleccionado }
+        listaServicios.clear()
+        listaServicios.addAll(listaServiciosBase.map { 
+            it.copy(seleccionado = currentSelections[it.id] ?: false) 
+        })
     }
 
     // --- ESTADOS PARA LOS POPUPS (DIALOGS) ---
@@ -305,13 +307,11 @@ fun AgendaScreen(viewModel: AgendaViewModel = viewModel(), onNavigateToCliente: 
                     Button(onClick = {
                         val precioFloat = tempPrecio.toFloatOrNull() ?: 0f
                         if (servicioEditando == null) {
-                            val nuevoId = (listaServicios.mapNotNull { it.id.toIntOrNull() }.maxOrNull() ?: 0) + 1
-                            listaServicios.add(ServicioEvento(nuevoId.toString(), tempNombre, tempDesc.ifBlank { "Sin descripción" }, precioFloat, false))
+                            val nuevoServicio = ServicioEvento("", tempNombre, tempDesc.ifBlank { "Sin descripción" }, precioFloat, false)
+                            viewModel.guardarServicio(nuevoServicio)
                         } else {
-                            val index = listaServicios.indexOfFirst { it.id == servicioEditando!!.id }
-                            if (index != -1) {
-                                listaServicios[index] = servicioEditando!!.copy(nombre = tempNombre, descripcion = tempDesc, precio = precioFloat)
-                            }
+                            val servicioActualizado = servicioEditando!!.copy(nombre = tempNombre, descripcion = tempDesc, precio = precioFloat)
+                            viewModel.actualizarServicio(servicioActualizado)
                         }
                         mostrarDialogoServicio = false
                     }) { Text("Guardar") }
@@ -329,7 +329,7 @@ fun AgendaScreen(viewModel: AgendaViewModel = viewModel(), onNavigateToCliente: 
                 confirmButton = {
                     Button(
                         onClick = {
-                            listaServicios.remove(servicioAEliminar)
+                            servicioAEliminar?.let { viewModel.eliminarServicio(it.id) }
                             servicioAEliminar = null
                         },
                         colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)
