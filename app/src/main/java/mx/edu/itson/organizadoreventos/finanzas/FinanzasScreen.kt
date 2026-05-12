@@ -33,6 +33,7 @@ import mx.edu.itson.organizadoreventos.R
 import mx.edu.itson.organizadoreventos.model.Abono
 import mx.edu.itson.organizadoreventos.model.Evento
 
+// Extensión para calcular el total estimado de un evento sumando sus servicios
 val Evento.totalEstimado: Float
     get() = servicios.sumOf { it.precio.toDouble() }.toFloat()
 
@@ -57,61 +58,68 @@ fun FinanzasScreen(viewModel: FinanzasViewModel = viewModel()) {
         if (eventoSeleccionado == null) {
             // VISTA 1: LISTA DE EVENTOS Y DASHBOARD
             Column(modifier = Modifier.fillMaxSize().padding(paddingValues).padding(16.dp)) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Image(
-                    painter = painterResource(id = R.drawable.logo_empresa),
-                    contentDescription = "Logo",
-                    modifier = Modifier
-                        .size(40.dp)
-                        .clip(CircleShape)
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Image(
+                        painter = painterResource(id = R.drawable.logo_empresa),
+                        contentDescription = "Logo",
+                        modifier = Modifier
+                            .size(40.dp)
+                            .clip(CircleShape)
+                    )
+                    Spacer(modifier = Modifier.width(12.dp))
+                    Text("Dashboard Financiero", style = MaterialTheme.typography.headlineMedium, color = MaterialTheme.colorScheme.primary)
+                }
+
+                Spacer(modifier = Modifier.height(16.dp))
+
+                // --- RESUMEN MENSUAL ---
+                ResumenMensualCard(eventosRegistrados)
+
+                Spacer(modifier = Modifier.height(24.dp))
+
+                OutlinedTextField(
+                    value = searchQuery,
+                    onValueChange = { searchQuery = it },
+                    label = { Text("Buscar evento o fecha (ej. 15/05/2026)") },
+                    leadingIcon = { Icon(Icons.Default.Search, contentDescription = "Buscar") },
+                    modifier = Modifier.fillMaxWidth(),
+                    singleLine = true
                 )
-                Spacer(modifier = Modifier.width(12.dp))
-                Text("Dashboard Financiero", style = MaterialTheme.typography.headlineMedium, color = MaterialTheme.colorScheme.primary)
-            }
 
-            Spacer(modifier = Modifier.height(16.dp))
+                Spacer(modifier = Modifier.height(16.dp))
 
-            // --- RESUMEN MENSUAL ---
-            ResumenMensualCard(eventosRegistrados)
+                val eventosFiltrados = eventosRegistrados.filter {
+                    it.tipoEvento.contains(searchQuery, ignoreCase = true) ||
+                            it.fecha.contains(searchQuery, ignoreCase = true)
+                }
 
-            Spacer(modifier = Modifier.height(24.dp))
-
-            OutlinedTextField(
-                value = searchQuery,
-                onValueChange = { searchQuery = it },
-                label = { Text("Buscar evento o fecha (ej. 15/05/2026)") },
-                leadingIcon = { Icon(Icons.Default.Search, contentDescription = "Buscar") },
-                modifier = Modifier.fillMaxWidth(),
-                singleLine = true
-            )
-
-            Spacer(modifier = Modifier.height(16.dp))
-
-            val eventosFiltrados = eventosRegistrados.filter {
-                it.tipoEvento.contains(searchQuery, ignoreCase = true) ||
-                        it.fecha.contains(searchQuery, ignoreCase = true)
-            }
-
-            LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                items(eventosFiltrados) { evento ->
+                LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    items(eventosFiltrados) { evento ->
                         TarjetaEvento(
                             evento = evento,
                             onClick = { eventoSeleccionado = evento },
                             onUpdateEstado = { nuevoEstado ->
                                 viewModel.actualizarEstadoEvento(evento.id, nuevoEstado)
+                            },
+                            onEliminar = {
+                                viewModel.eliminarEvento(evento.id)
                             }
                         )
+                    }
                 }
             }
-        }
-    } else {
+        } else {
             DetalleFinanzasView(
                 evento = eventoSeleccionado!!,
                 onBack = { eventoSeleccionado = null },
                 onRegistrarAbono = { fecha, monto ->
                     viewModel.registrarAbono(eventoSeleccionado!!.id, fecha, monto)
-                    // Optimistic update so UI reacts immediately, but it will be overwritten by Flow
+                    // Actualización optimista para reactividad inmediata
                     eventoSeleccionado = eventoSeleccionado!!.copy(abonos = eventoSeleccionado!!.abonos + (System.currentTimeMillis().toString() to Abono(fecha = fecha, monto = monto)))
+                },
+                onActualizarEvento = { eventoEditado ->
+                    viewModel.actualizarEvento(eventoEditado)
+                    eventoSeleccionado = eventoEditado
                 }
             )
         }
@@ -130,14 +138,14 @@ fun ResumenMensualCard(eventos: List<Evento>) {
     val anioFiltroStr = calendar.get(Calendar.YEAR).toString()
     val filtroFechaAbono = "/$mesFiltroStr/$anioFiltroStr"
 
-    // 1. Ganancia Mensual: Abonos de TODOS los eventos que se hicieron en este mes
+    // Ganancia Mensual: Abonos de TODOS los eventos que se hicieron en este mes
     val gananciaMensual = eventos.filter { it.estado != "Cancelado" }.sumOf { evento ->
         val abonosDelEvento = evento.abonos.values.toList()
         abonosDelEvento.filter { it.fecha.endsWith(filtroFechaAbono) }
             .sumOf { it.monto.toDoubleOrNull() ?: 0.0 }
     }.toFloat()
 
-    // 2. Falta Por Abonar: Deuda total de TODOS los eventos activos (sin importar la fecha de la fiesta)
+    // Falta Por Abonar: Deuda total de TODOS los eventos activos
     val faltaPorAbonarGlobal = eventos.filter { it.estado != "Cancelado" }.sumOf { evento ->
         val abonosDelEvento = evento.abonos.values.toList()
         val pagado = abonosDelEvento.sumOf { it.monto.toDoubleOrNull() ?: 0.0 }
@@ -161,7 +169,6 @@ fun ResumenMensualCard(eventos: List<Evento>) {
                 Box(modifier = Modifier.width(1.dp).height(50.dp).background(Color.LightGray).align(Alignment.CenterVertically))
 
                 Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.weight(1f)) {
-                    // Mantenemos el nombre del mes para cumplir tu rúbrica, pero el cálculo ya es global
                     Text("Falta Por Abonar", style = MaterialTheme.typography.labelLarge, color = Color.Gray)
                     Text("($nombreMesActual)", style = MaterialTheme.typography.labelMedium, color = Color.Gray)
                     Spacer(modifier = Modifier.height(4.dp))
@@ -174,8 +181,14 @@ fun ResumenMensualCard(eventos: List<Evento>) {
 
 // --- COMPONENTE: TARJETA DE EVENTO CON MENÚ DE ESTADO ---
 @Composable
-fun TarjetaEvento(evento: Evento, onClick: () -> Unit, onUpdateEstado: (String) -> Unit) {
+fun TarjetaEvento(
+    evento: Evento,
+    onClick: () -> Unit,
+    onUpdateEstado: (String) -> Unit,
+    onEliminar: () -> Unit
+) {
     var mostrarMenu by remember { mutableStateOf(false) }
+    var mostrarConfirmacionEliminar by remember { mutableStateOf(false) }
 
     val colorEstado = when (evento.estado) {
         "Terminado" -> Color(0xFF388E3C)
@@ -209,18 +222,47 @@ fun TarjetaEvento(evento: Evento, onClick: () -> Unit, onUpdateEstado: (String) 
                     DropdownMenuItem(text = { Text("Marcar como Activo") }, onClick = { onUpdateEstado("Activo"); mostrarMenu = false })
                     DropdownMenuItem(text = { Text("Marcar como Terminado") }, onClick = { onUpdateEstado("Terminado"); mostrarMenu = false })
                     DropdownMenuItem(text = { Text("Marcar como Cancelado") }, onClick = { onUpdateEstado("Cancelado"); mostrarMenu = false })
+                    HorizontalDivider()
+                    DropdownMenuItem(
+                        text = { Text("Eliminar Evento", color = MaterialTheme.colorScheme.error) },
+                        onClick = { mostrarMenu = false; mostrarConfirmacionEliminar = true }
+                    )
                 }
             }
         }
+    }
+
+    // Diálogo de confirmación de eliminación
+    if (mostrarConfirmacionEliminar) {
+        AlertDialog(
+            onDismissRequest = { mostrarConfirmacionEliminar = false },
+            title = { Text("Eliminar Evento") },
+            text = { Text("¿Estás seguro de que deseas eliminar el evento '${evento.tipoEvento}' de ${evento.clienteNombre}? Esta acción no se puede deshacer.") },
+            confirmButton = {
+                Button(
+                    onClick = { onEliminar(); mostrarConfirmacionEliminar = false },
+                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)
+                ) { Text("Sí, Eliminar") }
+            },
+            dismissButton = {
+                TextButton(onClick = { mostrarConfirmacionEliminar = false }) { Text("Cancelar") }
+            }
+        )
     }
 }
 
 // --- VISTA DETALLE DE FINANZAS ---
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun DetalleFinanzasView(evento: Evento, onBack: () -> Unit, onRegistrarAbono: (String, String) -> Unit) {
+fun DetalleFinanzasView(
+    evento: Evento,
+    onBack: () -> Unit,
+    onRegistrarAbono: (String, String) -> Unit,
+    onActualizarEvento: (Evento) -> Unit
+) {
     var showSheet by remember { mutableStateOf(false) }
     var mostrarTicket by remember { mutableStateOf(false) }
+    var mostrarEditar by remember { mutableStateOf(false) }
 
     val pagado = evento.abonos.values.sumOf { it.monto.toIntOrNull() ?: 0 }.toFloat()
     val progreso = if (evento.totalEstimado > 0) (pagado / evento.totalEstimado).coerceAtMost(1f) else 0f
@@ -253,8 +295,18 @@ fun DetalleFinanzasView(evento: Evento, onBack: () -> Unit, onRegistrarAbono: (S
         }
     ) { padding ->
         Column(modifier = Modifier.padding(padding).padding(horizontal = 16.dp)) {
-            Button(onClick = { mostrarTicket = true }, modifier = Modifier.fillMaxWidth().padding(bottom = 16.dp), colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.secondary)) {
-                Text("Mostrar Ticket de Cotización")
+            // Botones de acción
+            Row(modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Button(
+                    onClick = { mostrarTicket = true },
+                    modifier = Modifier.weight(1f),
+                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.secondary)
+                ) { Text("Ver Ticket") }
+
+                OutlinedButton(
+                    onClick = { mostrarEditar = true },
+                    modifier = Modifier.weight(1f)
+                ) { Text("Editar Evento") }
             }
 
             Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxWidth()) {
@@ -292,6 +344,78 @@ fun DetalleFinanzasView(evento: Evento, onBack: () -> Unit, onRegistrarAbono: (S
         }
 
         if (mostrarTicket) { Dialog(onDismissRequest = { mostrarTicket = false }) { TicketDialogView(evento) } }
+
+        if (mostrarEditar) {
+            Dialog(onDismissRequest = { mostrarEditar = false }) {
+                EditarEventoDialog(
+                    evento = evento,
+                    onConfirm = { eventoEditado ->
+                        onActualizarEvento(eventoEditado)
+                        mostrarEditar = false
+                    },
+                    onDismiss = { mostrarEditar = false }
+                )
+            }
+        }
+    }
+}
+
+// --- DIÁLOGO PARA EDITAR UN EVENTO (UPDATE COMPLETO) ---
+@Composable
+fun EditarEventoDialog(evento: Evento, onConfirm: (Evento) -> Unit, onDismiss: () -> Unit) {
+    var tipoEvento by remember { mutableStateOf(evento.tipoEvento) }
+    var fecha by remember { mutableStateOf(evento.fecha) }
+    var hora by remember { mutableStateOf(evento.hora) }
+    var notas by remember { mutableStateOf(evento.notas) }
+
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        elevation = CardDefaults.cardElevation(8.dp)
+    ) {
+        Column(modifier = Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            Text("Editar Evento", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
+            HorizontalDivider()
+
+            OutlinedTextField(
+                value = tipoEvento,
+                onValueChange = { tipoEvento = it },
+                label = { Text("Tipo de Evento") },
+                modifier = Modifier.fillMaxWidth(),
+                singleLine = true
+            )
+            OutlinedTextField(
+                value = fecha,
+                onValueChange = { fecha = it },
+                label = { Text("Fecha (DD/MM/YYYY)") },
+                modifier = Modifier.fillMaxWidth(),
+                singleLine = true
+            )
+            OutlinedTextField(
+                value = hora,
+                onValueChange = { hora = it },
+                label = { Text("Hora") },
+                modifier = Modifier.fillMaxWidth(),
+                singleLine = true
+            )
+            OutlinedTextField(
+                value = notas,
+                onValueChange = { notas = it },
+                label = { Text("Notas") },
+                modifier = Modifier.fillMaxWidth(),
+                minLines = 2
+            )
+
+            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                TextButton(onClick = onDismiss, modifier = Modifier.weight(1f)) { Text("Cancelar") }
+                Button(
+                    onClick = {
+                        onConfirm(evento.copy(tipoEvento = tipoEvento, fecha = fecha, hora = hora, notas = notas))
+                    },
+                    modifier = Modifier.weight(1f),
+                    enabled = tipoEvento.isNotBlank() && fecha.isNotBlank() && hora.isNotBlank()
+                ) { Text("Guardar") }
+            }
+        }
     }
 }
 
@@ -339,7 +463,11 @@ fun FormularioPago(onConfirm: (String, String) -> Unit) {
         Spacer(modifier = Modifier.height(8.dp))
         OutlinedTextField(value = fecha, onValueChange = { fecha = it }, label = { Text("Fecha (DD/MM/YYYY)") }, modifier = Modifier.fillMaxWidth())
         Spacer(modifier = Modifier.height(24.dp))
-        Button(onClick = { onConfirm(fecha, monto) }, modifier = Modifier.fillMaxWidth(), enabled = monto.isNotEmpty()) {
+        Button(
+            onClick = { onConfirm(fecha, monto) },
+            modifier = Modifier.fillMaxWidth(),
+            enabled = monto.isNotEmpty() && monto.toIntOrNull()?.let { it > 0 } == true
+        ) {
             Text("Confirmar y Actualizar")
         }
     }

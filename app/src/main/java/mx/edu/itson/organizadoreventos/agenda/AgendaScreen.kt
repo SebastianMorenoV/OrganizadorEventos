@@ -38,6 +38,7 @@ fun AgendaScreen(viewModel: AgendaViewModel = viewModel(), onNavigateToCliente: 
     val listaClientes by viewModel.listaClientes.collectAsState()
 
     // --- ESTADOS DE RESERVA ---
+    var intentoAgendar by remember { mutableStateOf(false) }
     var tipoEvento by remember { mutableStateOf("") }
 
     var clienteSeleccionado by remember { mutableStateOf<Cliente?>(null) }
@@ -122,8 +123,9 @@ fun AgendaScreen(viewModel: AgendaViewModel = viewModel(), onNavigateToCliente: 
                     }
                     Button(
                         onClick = {
+                            intentoAgendar = true
                             val cliente = clienteSeleccionado
-                            if (cliente != null) {
+                            if (cliente != null && tipoEvento.isNotEmpty() && fechaSeleccionada.isNotEmpty() && horaSeleccionada.isNotEmpty() && subtotal > 0) {
                                 viewModel.agendarEvento(
                                     tipoEvento = tipoEvento,
                                     clienteId = cliente.id,
@@ -135,8 +137,7 @@ fun AgendaScreen(viewModel: AgendaViewModel = viewModel(), onNavigateToCliente: 
                                 )
                             }
                         },
-                        // VALIDACIÓN ACTUALIZADA INCLUYENDO EL TIPO DE EVENTO
-                        enabled = tipoEvento.isNotEmpty() && clienteSeleccionado != null && fechaSeleccionada.isNotEmpty() && horaSeleccionada.isNotEmpty() && subtotal > 0 && !viewModel.estaGuardando
+                        enabled = !viewModel.estaGuardando
                     ) {
                         if (viewModel.estaGuardando) {
                             CircularProgressIndicator(color = Color.White, modifier = Modifier.size(20.dp))
@@ -162,13 +163,16 @@ fun AgendaScreen(viewModel: AgendaViewModel = viewModel(), onNavigateToCliente: 
             item {
                 Text("1. Detalles del Evento", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
                 Spacer(modifier = Modifier.height(8.dp))
+                val errorTipoEvento = intentoAgendar && tipoEvento.isEmpty()
                 OutlinedTextField(
                     value = tipoEvento,
                     onValueChange = { tipoEvento = it },
                     label = { Text("Tipo de evento (Boda, XV, etc.)") },
                     modifier = Modifier.fillMaxWidth(),
                     singleLine = true,
-                    keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Sentences)
+                    keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Sentences),
+                    isError = errorTipoEvento,
+                    supportingText = { if (errorTipoEvento) Text("Este campo es obligatorio") }
                 )
             }
 
@@ -176,13 +180,16 @@ fun AgendaScreen(viewModel: AgendaViewModel = viewModel(), onNavigateToCliente: 
             item {
                 Text("2. Datos del Cliente", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
                 Spacer(modifier = Modifier.height(8.dp))
+                val errorCliente = intentoAgendar && clienteSeleccionado == null
                 ExposedDropdownMenuBox(expanded = expandirClientes, onExpandedChange = { expandirClientes = it }) {
                     OutlinedTextField(
                         value = clienteSeleccionado?.nombre ?: "Seleccione un cliente",
                         onValueChange = {},
                         readOnly = true,
                         trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expandirClientes) },
-                        modifier = Modifier.fillMaxWidth().menuAnchor()
+                        modifier = Modifier.fillMaxWidth().menuAnchor(),
+                        isError = errorCliente,
+                        supportingText = { if (errorCliente) Text("Debe seleccionar un cliente") }
                     )
                     ExposedDropdownMenu(expanded = expandirClientes, onDismissRequest = { expandirClientes = false }) {
                         listaClientes.forEach { cliente ->
@@ -202,16 +209,33 @@ fun AgendaScreen(viewModel: AgendaViewModel = viewModel(), onNavigateToCliente: 
                 Text("3. Cuándo será el evento", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
                 Spacer(modifier = Modifier.height(8.dp))
                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    OutlinedButton(onClick = { showDatePicker = true }, modifier = Modifier.weight(1f)) {
-                        Text(fechaSeleccionada.ifEmpty { "Día/Mes/Año" })
+                    val errorFecha = intentoAgendar && fechaSeleccionada.isEmpty()
+                    Column(modifier = Modifier.weight(1f)) {
+                        OutlinedButton(
+                            onClick = { showDatePicker = true }, 
+                            modifier = Modifier.fillMaxWidth(),
+                            border = if (errorFecha) androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.error) else ButtonDefaults.outlinedButtonBorder
+                        ) {
+                            Text(fechaSeleccionada.ifEmpty { "Día/Mes/Año" }, color = if (errorFecha) MaterialTheme.colorScheme.error else Color.Unspecified)
+                        }
+                        if (errorFecha) Text("Requerido", color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(start = 16.dp, top = 4.dp))
                     }
-                    ExposedDropdownMenuBox(expanded = expandirHoras, onExpandedChange = { expandirHoras = it }, modifier = Modifier.weight(1f)) {
-                        OutlinedButton(onClick = { expandirHoras = true }, modifier = Modifier.fillMaxWidth().menuAnchor()) {
-                            Text(horaSeleccionada.ifEmpty { "Hora" })
+                    
+                    val errorHora = intentoAgendar && horaSeleccionada.isEmpty()
+                    Column(modifier = Modifier.weight(1f)) {
+                        ExposedDropdownMenuBox(expanded = expandirHoras, onExpandedChange = { expandirHoras = it }, modifier = Modifier.fillMaxWidth()) {
+                            OutlinedButton(
+                                onClick = { expandirHoras = true }, 
+                                modifier = Modifier.fillMaxWidth().menuAnchor(),
+                                border = if (errorHora) androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.error) else ButtonDefaults.outlinedButtonBorder
+                            ) {
+                                Text(horaSeleccionada.ifEmpty { "Hora" }, color = if (errorHora) MaterialTheme.colorScheme.error else Color.Unspecified)
+                            }
+                            ExposedDropdownMenu(expanded = expandirHoras, onDismissRequest = { expandirHoras = false }) {
+                                listaHorasMock.forEach { hora -> DropdownMenuItem(text = { Text(hora) }, onClick = { horaSeleccionada = hora; expandirHoras = false }) }
+                            }
                         }
-                        ExposedDropdownMenu(expanded = expandirHoras, onDismissRequest = { expandirHoras = false }) {
-                            listaHorasMock.forEach { hora -> DropdownMenuItem(text = { Text(hora) }, onClick = { horaSeleccionada = hora; expandirHoras = false }) }
-                        }
+                        if (errorHora) Text("Requerido", color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(start = 16.dp, top = 4.dp))
                     }
                 }
             }
@@ -220,7 +244,13 @@ fun AgendaScreen(viewModel: AgendaViewModel = viewModel(), onNavigateToCliente: 
             item {
                 HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-                    Text("4. Catálogo de Servicios", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
+                    Column {
+                        Text("4. Catálogo de Servicios", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
+                        val errorServicios = intentoAgendar && subtotal <= 0
+                        if (errorServicios) {
+                            Text("Debe seleccionar al menos un servicio", color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
+                        }
+                    }
                     IconButton(
                         onClick = {
                             servicioEditando = null
@@ -351,6 +381,7 @@ fun AgendaScreen(viewModel: AgendaViewModel = viewModel(), onNavigateToCliente: 
                     Button(onClick = {
                         viewModel.resetEstadoExito()
                         // Reset forms
+                        intentoAgendar = false
                         tipoEvento = ""
                         clienteSeleccionado = null
                         fechaSeleccionada = ""

@@ -12,32 +12,60 @@ import kotlinx.coroutines.launch
 import mx.edu.itson.organizadoreventos.data.ClienteRepository
 import mx.edu.itson.organizadoreventos.model.Cliente
 
+/**
+ * ViewModel para el módulo de Clientes.
+ * Gestiona el estado del formulario de registro/edición, la lista en tiempo real
+ * y las operaciones CRUD sobre los clientes en Firebase.
+ */
 class ClienteViewModel : ViewModel() {
 
     private val repository = ClienteRepository()
 
-    // ESTADO DE LA UI PARA LISTA
+    /** Lista de clientes obtenida en tiempo real desde Firebase. */
     private val _listaClientes = MutableStateFlow<List<Cliente>>(emptyList())
     val listaClientes: StateFlow<List<Cliente>> = _listaClientes.asStateFlow()
 
-    // ESTADO DE LA UI PARA FORMULARIO
+    // --- Estado del formulario ---
+    /** ID del cliente que se está editando. Null si el formulario es de registro nuevo. */
     var clienteIdEditando: String? = null
+
+    /** Nombre del cliente en el formulario. */
     var nombre by mutableStateOf("")
+
+    /** Teléfono del cliente en el formulario. */
     var telefono by mutableStateOf("")
+
+    /** Correo electrónico del cliente en el formulario. */
     var correo by mutableStateOf("")
 
-    // ESTADO DE ERRORES Y CARGA
+    // --- Estado de validación ---
+    /** Bandera de error para el campo nombre. */
     var errorNombre by mutableStateOf(false)
+
+    /** Bandera de error para el campo teléfono. */
     var errorTelefono by mutableStateOf(false)
+
+    /** Bandera de error para el campo correo. */
     var errorCorreo by mutableStateOf(false)
+
+    // --- Estado de carga y retroalimentación ---
+    /** Indica si hay una operación de escritura en curso. */
     var estaGuardando by mutableStateOf(false)
+
+    /** Bandera que indica que el guardado fue exitoso para disparar el Snackbar. */
     var guardadoExitoso by mutableStateOf(false)
+
+    /** Mensaje de error para mostrar en Snackbar. Null si no hay error. */
     var errorMessage by mutableStateOf<String?>(null)
 
     init {
         cargarClientes()
     }
 
+    /**
+     * Inicia la observación en tiempo real de los clientes del usuario autenticado.
+     * Se llama automáticamente al crear el ViewModel.
+     */
     private fun cargarClientes() {
         viewModelScope.launch {
             repository.obtenerClientes().collect { clientes ->
@@ -46,6 +74,12 @@ class ClienteViewModel : ViewModel() {
         }
     }
 
+    /**
+     * Valida el formulario y guarda o actualiza un cliente en Firebase.
+     * Si [clienteIdEditando] es null, crea un cliente nuevo (CREATE).
+     * Si [clienteIdEditando] tiene valor, actualiza el cliente existente (UPDATE).
+     * Verifica duplicados de teléfono y correo antes de persistir.
+     */
     fun guardarCliente() {
         errorNombre = nombre.isBlank()
         errorTelefono = telefono.length != 10
@@ -90,6 +124,11 @@ class ClienteViewModel : ViewModel() {
         }
     }
 
+    /**
+     * Carga los datos de un cliente existente en el formulario para su edición.
+     *
+     * @param cliente Objeto [Cliente] cuyos datos se copiarán en el formulario.
+     */
     fun editarCliente(cliente: Cliente) {
         clienteIdEditando = cliente.id
         nombre = cliente.nombre
@@ -100,6 +139,9 @@ class ClienteViewModel : ViewModel() {
         errorCorreo = false
     }
 
+    /**
+     * Limpia todos los campos del formulario y restablece el modo de creación nuevo.
+     */
     fun limpiarFormulario() {
         clienteIdEditando = null
         nombre = ""
@@ -110,6 +152,12 @@ class ClienteViewModel : ViewModel() {
         errorCorreo = false
     }
 
+    /**
+     * Elimina permanentemente un cliente de Firebase (DELETE).
+     * Si el cliente eliminado era el que se estaba editando, limpia el formulario.
+     *
+     * @param clienteId ID único del cliente a eliminar.
+     */
     fun eliminarCliente(clienteId: String) {
         viewModelScope.launch {
             estaGuardando = true
@@ -126,10 +174,12 @@ class ClienteViewModel : ViewModel() {
         }
     }
 
+    /** Resetea la bandera [guardadoExitoso] después de mostrar el Snackbar de éxito. */
     fun resetEstadoExito() {
         guardadoExitoso = false
     }
     
+    /** Limpia el mensaje de error actual. */
     fun clearError() {
         errorMessage = null
     }

@@ -12,14 +12,29 @@ import kotlinx.coroutines.tasks.await
 import mx.edu.itson.organizadoreventos.model.Abono
 import mx.edu.itson.organizadoreventos.model.Evento
 
+/**
+ * Repositorio que gestiona todas las operaciones CRUD de [Evento]
+ * en Firebase Realtime Database bajo la ruta `usuarios/{uid}/eventos`.
+ */
 class EventoRepository {
     private val database = FirebaseDatabase.getInstance()
     private val auth = FirebaseAuth.getInstance()
 
+    /**
+     * Retorna la referencia de Firebase para los eventos del usuario autenticado.
+     * Devuelve `null` si no hay sesión activa.
+     */
     private fun getEventosRef() = auth.currentUser?.uid?.let { uid ->
         database.getReference("usuarios").child(uid).child("eventos")
     }
 
+    /**
+     * Guarda un nuevo evento en Firebase (CREATE).
+     * Genera un ID único con `push()` y almacena el objeto serializado.
+     *
+     * @param evento Objeto [Evento] a persistir.
+     * @return [Result.success] si se guardó correctamente, [Result.failure] en caso de error.
+     */
     suspend fun guardarEvento(evento: Evento): Result<Unit> {
         val ref = getEventosRef() ?: return Result.failure(Exception("Usuario no autenticado"))
         
@@ -33,6 +48,12 @@ class EventoRepository {
         }
     }
 
+    /**
+     * Observa en tiempo real la lista de eventos del usuario autenticado (READ).
+     * Emite una nueva lista cada vez que Firebase detecta cambios.
+     *
+     * @return [Flow] que emite listas de [Evento] en tiempo real.
+     */
     fun obtenerEventos(): Flow<List<Evento>> = callbackFlow {
         val ref = getEventosRef()
         if (ref == null) {
@@ -61,6 +82,32 @@ class EventoRepository {
         awaitClose { ref.removeEventListener(listener) }
     }
 
+    /**
+     * Actualiza todos los campos de un evento existente en Firebase (UPDATE).
+     * Reemplaza el nodo completo con los nuevos valores del objeto.
+     *
+     * @param evento Objeto [Evento] con los datos actualizados. Su [Evento.id] debe existir.
+     * @return [Result.success] si se actualizó correctamente, [Result.failure] en caso de error.
+     */
+    suspend fun actualizarEvento(evento: Evento): Result<Unit> {
+        val ref = getEventosRef() ?: return Result.failure(Exception("Usuario no autenticado"))
+
+        return try {
+            ref.child(evento.id).setValue(evento).await()
+            Result.success(Unit)
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
+    /**
+     * Actualiza únicamente el campo `estado` de un evento (UPDATE parcial).
+     * Usado para marcar un evento como "Activo", "Terminado" o "Cancelado".
+     *
+     * @param eventoId ID único del evento a actualizar.
+     * @param estado Nuevo estado a asignar.
+     * @return [Result.success] si se actualizó correctamente, [Result.failure] en caso de error.
+     */
     suspend fun actualizarEstadoEvento(eventoId: String, estado: String): Result<Unit> {
         val ref = getEventosRef() ?: return Result.failure(Exception("Usuario no autenticado"))
         
@@ -72,6 +119,31 @@ class EventoRepository {
         }
     }
 
+    /**
+     * Elimina permanentemente un evento de Firebase (DELETE).
+     *
+     * @param eventoId ID único del evento a eliminar.
+     * @return [Result.success] si se eliminó correctamente, [Result.failure] en caso de error.
+     */
+    suspend fun eliminarEvento(eventoId: String): Result<Unit> {
+        val ref = getEventosRef() ?: return Result.failure(Exception("Usuario no autenticado"))
+
+        return try {
+            ref.child(eventoId).removeValue().await()
+            Result.success(Unit)
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
+    /**
+     * Agrega un abono al historial de pagos de un evento (UPDATE anidado).
+     * Genera un ID único para el abono con `push()`.
+     *
+     * @param eventoId ID del evento al que pertenece el abono.
+     * @param abono Objeto [Abono] con fecha y monto del pago.
+     * @return [Result.success] si se guardó correctamente, [Result.failure] en caso de error.
+     */
     suspend fun agregarAbono(eventoId: String, abono: Abono): Result<Unit> {
         val ref = getEventosRef() ?: return Result.failure(Exception("Usuario no autenticado"))
         

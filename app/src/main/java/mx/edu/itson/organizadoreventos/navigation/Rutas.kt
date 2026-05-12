@@ -20,6 +20,7 @@ import mx.edu.itson.organizadoreventos.screens.LoginScreen
 import mx.edu.itson.organizadoreventos.screens.RegisterScreen
 import mx.edu.itson.organizadoreventos.screens.SplashScreen
 import mx.edu.itson.organizadoreventos.finanzas.FinanzasScreen
+import mx.edu.itson.organizadoreventos.cotizacion.CotizacionScreen
 
 object RutasGlobales {
     const val SPLASH = "splash"
@@ -32,6 +33,7 @@ sealed class Rutas(val ruta: String, val titulo: String, val icono: ImageVector)
     object Cliente : Rutas("cliente", "Cliente", Icons.Default.Person)
     object Agenda : Rutas("agenda", "Agenda", Icons.Default.DateRange)
     object Finanzas : Rutas("finanzas", "Finanzas", Icons.Default.AddCircle)
+    object Cotizacion : Rutas("cotizacion", "Cotización", Icons.Default.List)
 }
 
 @Composable
@@ -101,7 +103,7 @@ fun AppNavigation() {
 @Composable
 fun MainApp(onLogout: () -> Unit) {
     val navControllerTabs = rememberNavController()
-    val items = listOf(Rutas.Cliente, Rutas.Agenda, Rutas.Finanzas)
+    val items = listOf(Rutas.Cliente, Rutas.Agenda, Rutas.Finanzas, Rutas.Cotizacion)
 
     Scaffold(
         topBar = {
@@ -148,6 +150,7 @@ fun MainApp(onLogout: () -> Unit) {
             composable(Rutas.Cliente.ruta) { ClienteScreen() }
             composable(Rutas.Agenda.ruta) { AgendaScreen(onNavigateToCliente = { navControllerTabs.navigate(Rutas.Cliente.ruta) }) }
             composable(Rutas.Finanzas.ruta) { FinanzasScreen() }
+            composable(Rutas.Cotizacion.ruta) { CotizacionScreen() }
         }
     }
 }
